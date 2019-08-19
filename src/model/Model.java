@@ -508,28 +508,33 @@ public abstract class Model extends SimState  {
 		super(0);
 		// start by initializing parameters, results, and values using the pre-existing function
 		String[] args = readFile(fname);
-		splitFile(fname, splitparams, splitkeys, args);
+		splitFile(fname, "", splitparams, splitkeys, args);
 	}
 	
 	/*
 	 * Splits input file parsed into args based on provided parameters
 	 */
-	public void splitFile(String fname, String[] splitparams, String[] splitkeys, String[] args) {
+	public void splitFile(String fname, String fext, String[] splitparams, String[] splitkeys, String[] args) {
 		// if all elements have been removed from split params, create a file
 		if(splitparams.length == 0) {
 			try {
 				// create a writer
-				BufferedWriter writer = new BufferedWriter(new FileWriter(fname));
+				BufferedWriter writer = new BufferedWriter(new FileWriter(fext + fname));
 				// start by adding the key parameters to the template
 				for(int k = 0; k < keyparams.length; k++) {
-					try {
-						writer.write("*" + keyparams[k] + " = " + Model.class.getField(keyparams[k]).get(this) + "\n");
-					} catch (NoSuchFieldException e) {
-						System.out.println("Tried to access a field that doesn't exist");
-					} catch (IllegalAccessException e) {
-						System.out.println("Tried to access a field that it doens't have access to");
+					// make sure it isn't the filename, which will be handled separately
+					if(!keyparams[k].equals("fname")) {
+						try {
+							writer.write("*" + keyparams[k] + " = " + Model.class.getField(keyparams[k]).get(this) + "\n");
+						} catch (NoSuchFieldException e) {
+							System.out.println("Tried to access a field that doesn't exist");
+						} catch (IllegalAccessException e) {
+							System.out.println("Tried to access a field that it doens't have access to");
+						}
 					}
 				}
+				// also add the file name
+				writer.write("*fname = " + fext + this.fname + "\n");
 				// now go through all of the normal parameters and put in their values
 				for(int p = 0; p < paramnames.length; p++) {
 					writer.write(paramnames[p] + " = " + args[p] + "\n");
@@ -556,7 +561,7 @@ public abstract class Model extends SimState  {
 				String[] newargs = Arrays.copyOf(args, args.length);
 				newargs[s] = vals[v];
 				// recurse
-				splitFile(splitkeys[0] + vals[v] + fname,
+				splitFile(fname, splitkeys[0] + vals[v] + fext,
 						Arrays.copyOfRange(splitparams, 1, splitparams.length),
 						Arrays.copyOfRange(splitkeys, 1, splitkeys.length), newargs);
 			}
