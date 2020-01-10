@@ -324,10 +324,10 @@ public abstract class Model extends SimState  {
 	 */
 	public void test(ArrayList<String> params) {
 		System.out.println(params.toString());
-		// set model parameters from args
-		setParams(params.toArray(new String[params.size()]));
 		// run the same simulation for the designated number of replications
 		for(int i = 0; i < reps; i++) {
+			// set model parameters from args (needs to be done fresh each time or they can build)
+			setParams(params.toArray(new String[params.size()]));
 			// store the seed for this run
 			int s = seed+i;
 			// create an array to store the timecourse results
@@ -412,6 +412,10 @@ public abstract class Model extends SimState  {
 	public void setParams(String[] params) {
 		// get the subclass
 		setSubclass();
+		// loop through all named results and initialize to zero
+		for(int r = 0; r < resnames.length; r++) {
+			setParamVal(subclass, resnames[r], "0");
+		}
 		// loop through all named parameters
 		for(int p = 0; p < paramnames.length; p++) {
 			// if that parameter is an actual field, assign its value based on params
