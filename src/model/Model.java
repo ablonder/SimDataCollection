@@ -38,18 +38,24 @@ public abstract class Model extends SimState  {
 	public int testint;
 	public boolean gui = false;
 	// list of parameter names - to be made in the child class
-	public static String[] paramnames;
+	public String[] paramnames;
 	// indicates whether to automatically use the subclass fields as parameters - default to true
 	public boolean autoparams = true;
 	// list of names of categories of data to gather - to be made in the child class
-	public static String[] resnames;
+	public String[] resnames;
 	// indicates whether to automatically use the remaining subclass fields as results categories
 	// defaults to true, but is only relevant when reading from file
 	public boolean autores = true;
+	// list of results to be gathered from each agent individually
+	public String[] agentres;
+	// list of agents
+	public Object[] agents;
 	// list of results names added from file for splitting
 	public String[] fileres;
 	// the subclass for use in accessing its fields
-	public static Class subclass;
+	public Class subclass;
+	// the agent class for use in accessing its fields
+	public Class agentclass;
 
 	/*
 	 * constructor when no file or arguments are given that just creates a template for input
@@ -80,7 +86,7 @@ public abstract class Model extends SimState  {
 		// creates the list of parameter names from the subclass
 		setNames();
 		// also get the subclass
-		setSubclass();
+		setClasses();
 		// if all the fields should automatically be added as parameters, add those
 		if(this.autoparams) {
 			// initialize an array list to hold the parameter names to make this easier
@@ -119,9 +125,26 @@ public abstract class Model extends SimState  {
 			while((line = file.readLine()) != null) {
 				// split each line at the equals sign
 				String[] splitline = line.split("=");
-				// if there's something after the equals sign, add it to params
-				if(splitline[1].length() > 1) {
-					// first check for key parameters marked by a star
+				// first catch agentInfo (which should be a key parameter)
+				if(splitline[0].trim().equals("*agentInfo")) {
+					// create a string to add to the results list for the header
+					String resstring = "*agent";
+					// check to see if there are any parameters provided after the equal sign or if this will all be done manually
+					if(this.autores && splitline[1].length() > 1) {
+						// split the parameters and use them to gather data from each agent
+						this.agentres = splitline[1].trim().split(" ");
+						// add the parameters to the results list string
+						resstring += "(";
+						for(int i = 0; i < this.agentres.length; i++) {
+							resstring += this.agentres[i] + ",";
+						}
+						resstring += ")";
+					}
+					// add the created string to the list of results
+					tempres.add(resstring);
+				} else if(splitline[1].length() > 1) {
+					// otherwise, if there's something after the equals sign, add it to params
+					// check for key parameters marked by a star
 					if(line.charAt(0) == '*' && Arrays.asList(keyparams).contains(splitline[0].trim().substring(1))) {
 						// modify the parameter's value
 						setParamVal(Model.class, splitline[0].trim().substring(1), splitline[1].trim());
@@ -331,18 +354,17 @@ public abstract class Model extends SimState  {
 			// store the seed for this run
 			int s = seed+i;
 			// create an array to store the timecourse results
-			double[][] timeres = new double[this.resnames.length][steps/testint];
+			String[][] timeres = new String[this.resnames.length][steps/testint];
 			// reseed with the seed parameter, plus the replication number
 			random.setSeed(s);
 			// start the simulation
 			start();
-			// run the simulation for that number of steps
+			// run the simulation for the designated number of steps
 			while(schedule.getSteps() < steps) {
-				// if this is the right step update the results array and add them to the time results array
+				// if this is the right step according to the test interval, update the results array and add them to the time results array
 				if(schedule.getSteps()%testint == 0) {
 					// also print what step it is so I can keep track of progress
-					// System.out.println(schedule.getSteps());
-					double[] results = updateRes();
+					String[] results = updateRes();
 					for(int j = 0; j < resnames.length; j++) {
 						timeres[j][(int) (schedule.getSteps()/testint)] = results[j];
 					}
@@ -401,9 +423,9 @@ public abstract class Model extends SimState  {
 	}
 
 	/*
-	 * The subclass has to set subclass to store its own type
+	 * The subclass has to set subclass to store its own type and agent to store the agent type
 	 */
-	public abstract void setSubclass();
+	public abstract void setClasses();
 
 	/*
 	 * takes an inputed list of strings and uses it to set parameter values
@@ -411,11 +433,13 @@ public abstract class Model extends SimState  {
 	 */
 	public void setParams(String[] params) {
 		// get the subclass
-		setSubclass();
+		setClasses();
 		// loop through all named results and initialize to zero
 		for(int r = 0; r < resnames.length; r++) {
 			setParamVal(subclass, resnames[r], "0");
 		}
+		// reinitialize the list of agents to an empty list
+		this.agents = new Object[0];
 		// loop through all named parameters
 		for(int p = 0; p < paramnames.length; p++) {
 			// if that parameter is an actual field, assign its value based on params
@@ -447,27 +471,69 @@ public abstract class Model extends SimState  {
 	 * updates the results array at the end of each step (or when needed)
 	 * the default assumes the names are the actual parameters
 	 */
-	public double[] updateRes() {
-		// first get the subclass
-		setSubclass();
+	public String[] updateRes() {
+		// first get the subclass and agent class
+		setClasses();
 		// initialize the list of results
-		double[] results = new double[resnames.length];
+		String[] results = new String[this.resnames.length];
 		// then loop through all the results categories and check if any of them are actual fields
-		for(int r = 0; r < resnames.length; r++) {
-			try {
-				Field f = subclass.getField(resnames[r]);
-				results[r] = ((Number) f.get(this)).doubleValue();
-			} catch(NoSuchFieldException e) {
-				// that's okay, this will just have to be dealt with in the subclass
-			} catch(IllegalAccessException e) {
-				// this is also okay
-			} catch(ClassCastException e) {
-				// this ensures that the field is a number, if not it will have to be dealt with in the subclass
+		for(int r = 0; r < this.resnames.length; r++) {
+			// if this is the agent results, handle them separately
+			if(this.resnames[r].length() > 5 && this.resnames[r].substring(0, 6).equals("*agent")) {
+				results[r] = getAgentRes();
+			} else {
+				try {
+					Field f = this.subclass.getField(this.resnames[r]);
+					// things that don't handle this well will just have to be dealt with elsewhere
+					results[r] = "" + f.get(this);
+				} catch(NoSuchFieldException e) {
+					// that's okay, this will just have to be dealt with in the subclass
+				} catch(IllegalAccessException e) {
+					// this is also okay
+				}
 			}
 		}
 		return(results);
 	}
-
+	
+	/*
+	 * Handles individual agent parameters, returns a long string with the parameters for each agent, all separated by commas
+	 */
+	public String getAgentRes() {
+		// initialize the results string
+		String res = "";
+		// go through each agent in the list and check for actual fields
+		for(Object o : this.agents) {
+			//  loop through each result and get the corresponding value
+			for(String r : this.agentres) {
+				res += getResult(r, o, this.agentclass) + ",";
+			}
+		}
+		return res;
+	}
+	
+	/*
+	 * Gets the value of a result parameter for a given object of a given class, and returns it as a string
+	 */
+	public String getResult(String res, Object o, Class c) {
+		// initialize string to empty
+		String p = "";
+		// make sure the object isn't null
+		if(o != null) {
+		// start by checking to see if it's an actual field, the subclass will do something else if it wants
+			try {
+				Field f = c.getField(res);
+				// things that don't handle this well will just have to be dealt with elsewhere
+				p += f.get(o);
+			} catch(NoSuchFieldException e) {
+				// that's okay, this will just have to be dealt with in the subclass
+			} catch(IllegalAccessException e) {
+				// this is also okay
+			}
+		}
+		return(p);
+	}
+	
 	/*
 	 * makes a template file that can then be read by the file based constructor
 	 * Don't forget seed, steps, reps, filename, and testint
@@ -489,7 +555,7 @@ public abstract class Model extends SimState  {
 			// if parameter or result names are to be set automatically, also list all of the subclass's fields
 			if(this.autoparams || this.autores) {
 				// first store the subclass
-				setSubclass();
+				setClasses();
 				Field[] fields = subclass.getDeclaredFields();
 				for(int f = 0; f < fields.length; f++) {
 					// make sure each field is a type it can handle
@@ -497,6 +563,8 @@ public abstract class Model extends SimState  {
 					if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE)
 						writer.write(fields[f].getName() + " = \n");
 				}
+				// and then add agent info at the bottom
+				writer.write("*agentInfo = ");
 			}
 			writer.close();
 		} catch (IOException e) {
