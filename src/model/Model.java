@@ -29,6 +29,8 @@ public abstract class Model extends SimState  {
 	public BufferedWriter endwriter;
 	// file writer for timecourse results taken at the indicated interval
 	public BufferedWriter timewriter;
+	// file writer for individual agent results (only created if results are provided to be taken)
+	public BufferedWriter agentwriter;
 	// key parameters used in every model (as class variables for access if the user wants them)
 	public static String[] keyparams = {"seed", "steps", "reps", "fname", "testint", "gui"};
 	public int seed = 0;
@@ -126,22 +128,15 @@ public abstract class Model extends SimState  {
 				// split each line at the equals sign
 				String[] splitline = line.split("=");
 				// first catch agentInfo (which should be a key parameter)
-				if(splitline[0].trim().equals("*agentInfo")) {
-					// create a string to add to the results list for the header
-					String resstring = "*agent";
-					// check to see if there are any parameters provided after the equal sign or if this will all be done manually
-					if(this.autores && splitline[1].length() > 1) {
-						// split the parameters and use them to gather data from each agent
-						this.agentres = splitline[1].trim().split(" ");
-						// add the parameters to the results list string
-						resstring += "(";
-						for(int i = 0; i < this.agentres.length; i++) {
-							resstring += this.agentres[i] + ",";
-						}
-						resstring += ")";
-					}
-					// add the created string to the list of results
-					tempres.add(resstring);
+				if(this.autores && splitline[0].trim().equals("*agentInfo") && splitline[1].length() > 1) {
+					// split the parameters to get the data gathered from each agent
+					ArrayList<String> newagentres = new ArrayList<String>(Arrays.asList(splitline[1].trim().split(" ")));
+					// grab the existing list of agent parameters
+					ArrayList<String> oldagentres = new ArrayList<String>(Arrays.asList(this.agentres));
+					// concatenate the two
+					oldagentres.addAll(newagentres);
+					// store the resulting complete list as an array
+					this.agentres = oldagentres.toArray(new String[oldagentres.size()]);
 				} else if(splitline[1].length() > 1) {
 					// otherwise, if there's something after the equals sign, add it to params
 					// check for key parameters marked by a star
@@ -161,7 +156,7 @@ public abstract class Model extends SimState  {
 				}
 			}
 			// now these lists can become/be added to the official lists
-			paramnames = tempparams.toArray(new String[tempparams.size()]);
+			this.paramnames = tempparams.toArray(new String[tempparams.size()]);
 			String[] args = tempvals.toArray(new String[tempvals.size()]);
 			// the results will take a little more doing because they have to be concatenated
 			// first store the added results just in case this is going to be used to split files
@@ -212,12 +207,20 @@ public abstract class Model extends SimState  {
 				System.exit(0);
 			}
 			try {
-				// files to write the results to
-				this.endwriter = new BufferedWriter(new FileWriter(this.fname+"endresults.txt"));
-				this.timewriter = new BufferedWriter(new FileWriter(this.fname + "timeresults.txt"));
-				// write in a header
-				makeHeader(this.endwriter, false);
-				makeHeader(this.timewriter, true);
+				// if there are whole model results, create files for those (one just at the end and one timecourse)
+				if(this.resnames.length > 0) {
+					// make files to write the results to
+					this.endwriter = new BufferedWriter(new FileWriter(this.fname+"endresults.txt"));
+					this.timewriter = new BufferedWriter(new FileWriter(this.fname + "timeresults.txt"));
+					// and write in a header
+					makeHeader(this.endwriter, false, false);
+					makeHeader(this.timewriter, true, false);
+				}
+				// if there are agent results, also create a file to hold those
+				if(this.agentres.length > 0) {
+					this.agentwriter = new BufferedWriter(new FileWriter(this.fname + "agentresults.txt"));
+					makeHeader(this.agentwriter, true, true);
+				}
 			} catch(IOException e) {
 				System.out.println("Something's wrong with your results files!");
 				System.exit(0);
@@ -237,8 +240,13 @@ public abstract class Model extends SimState  {
 				System.exit(0);
 			}
 			try {
-				this.endwriter.close();
-				this.timewriter.close();
+				if(this.resnames.length > 0) {
+					this.endwriter.close();
+					this.timewriter.close();
+				}
+				if(this.agentres.length > 0) {
+					this.agentwriter.close();
+				}
 			} catch (IOException e) {
 				System.out.println("Writer not closing...");
 			}
@@ -265,7 +273,7 @@ public abstract class Model extends SimState  {
 	/*
 	 * Writes the header for a results file
 	 */
-	public void makeHeader(BufferedWriter writer, boolean time) {
+	public void makeHeader(BufferedWriter writer, boolean time, boolean agent) {
 		try {
 			// start with the base parameters
 			writer.write("% Base Parameters: ");
@@ -311,9 +319,17 @@ public abstract class Model extends SimState  {
 			for(int t = 0; t < this.testparams.size(); t++) {
 				writer.write(this.paramnames[this.testparams.get(t)] + "\t");
 			}
-			// and add the headers for the actual categories of results
-			for(int r = 0; r < this.resnames.length; r++) {
-				writer.write(this.resnames[r] + "\t");
+			// if this file will hold agent data, add the headers for the categories of agent results
+			if(agent) {
+				writer.write("Agent\t");
+				for(int r = 0; r < this.agentres.length; r++) {
+					writer.write(this.agentres[r] + "\t");
+				}
+			} else {
+				// otherwise add the headers for the model results
+				for(int r = 0; r < this.resnames.length; r++) {
+					writer.write(this.resnames[r] + "\t");
+				}
 			}
 			// and then do a line break
 			writer.write("\n");
@@ -353,61 +369,27 @@ public abstract class Model extends SimState  {
 			setParams(params.toArray(new String[params.size()]));
 			// store the seed for this run
 			int s = seed+i;
-			// create an array to store the timecourse results
-			String[][] timeres = new String[this.resnames.length][steps/testint];
+			// also store the parameters for this run as a string for writing to file, starting with the seed
+			String p = s + "\t";
+			// followed by all the parameter values
+			for(int t = 0; t < this.testparams.size(); t++) {
+				p += params.get(this.testparams.get(t)) + "\t";
+			}
 			// reseed with the seed parameter, plus the replication number
 			random.setSeed(s);
 			// start the simulation
 			start();
 			// run the simulation for the designated number of steps
 			while(schedule.getSteps() < steps) {
-				// if this is the right step according to the test interval, update the results array and add them to the time results array
+				// if this is the right step according to the test interval, write the results for this step
 				if(schedule.getSteps()%testint == 0) {
-					// also print what step it is so I can keep track of progress
-					String[] results = updateRes();
-					for(int j = 0; j < resnames.length; j++) {
-						timeres[j][(int) (schedule.getSteps()/testint)] = results[j];
-					}
+					writeResults(p, false);
 				}
 				if (!schedule.step(this)) break;
 			}
+			// get the end results once it's all done
+			writeResults(p, true);
 			finish();
-			// try to write all those results to file
-			try {
-				// starting with the final population and learning results
-				// first write the seed
-				this.endwriter.write(s + "\t");
-				// then write in all the test parameter values for this run
-				for(int t = 0; t < this.testparams.size(); t++) {
-					this.endwriter.write(params.get(this.testparams.get(t)) + "\t");
-				}
-				// then write the results from this run
-				for(int r = 0; r < this.resnames.length; r++) {
-					this.endwriter.write(timeres[r][steps/testint-1] + "\t");
-				}
-				// lastly, make a newline
-				this.endwriter.write("\n");
-				// and then do the timecourse results
-				// start with the parameter values used for this run
-				this.timewriter.write("% " + params.toString() + "\n");
-				// and then write the parameters and results and for each step
-				for(int t = 0; t < steps/testint; t++) {
-					// first write the seed and the timestep
-					this.timewriter.write(s + "\t" + testint*t + "\t");
-					// then write the parameter values for this run (which will be the same on each line)
-					for(int p = 0; p < this.testparams.size(); p++) {
-						this.timewriter.write(params.get(this.testparams.get(p)) + "\t");
-					}
-					// then we can write the results
-					for(int r = 0; r < this.resnames.length; r++) {
-						this.timewriter.write(timeres[r][t] + "\t");
-					}
-					// and now go to the next line
-					this.timewriter.write("\n");
-				}
-			} catch (IOException e) {
-				System.out.println("Failed to write results to file...");
-			}
 		}
 	}
 
@@ -417,9 +399,11 @@ public abstract class Model extends SimState  {
 	 */
 	public void setNames() {
 		// defaults to an empty list of parameters that will be filled in by the subclass's fields
-		paramnames = new String[0];
+		this.paramnames = new String[0];
 		// and an empty list of result categories (will only be filled in if reading from file)
-		resnames = new String[0];
+		this.resnames = new String[0];
+		// and an empty list of agent results
+		this.agentres = new String[0];
 	}
 
 	/*
@@ -468,52 +452,50 @@ public abstract class Model extends SimState  {
 	}
 
 	/*
-	 * updates the results array at the end of each step (or when needed)
-	 * the default assumes the names are the actual parameters
+	 * writes results to file after the test interval
 	 */
-	public String[] updateRes() {
+	public void writeResults(String params, boolean end) {
 		// first get the subclass and agent class
 		setClasses();
-		// initialize the list of results
-		String[] results = new String[this.resnames.length];
-		// then loop through all the results categories and check if any of them are actual fields
-		for(int r = 0; r < this.resnames.length; r++) {
-			// if this is the agent results, handle them separately
-			if(this.resnames[r].length() > 5 && this.resnames[r].substring(0, 6).equals("*agent")) {
-				results[r] = getAgentRes();
-			} else {
-				try {
-					Field f = this.subclass.getField(this.resnames[r]);
-					// things that don't handle this well will just have to be dealt with elsewhere
-					results[r] = "" + f.get(this);
-				} catch(NoSuchFieldException e) {
-					// that's okay, this will just have to be dealt with in the subclass
-				} catch(IllegalAccessException e) {
-					// this is also okay
+		// surround it all with a try catch for the file writing
+		try {
+			// get whole model results (if any have been designated for collection)
+			if(this.resnames.length > 0) {
+				// initialize the result string
+				String res = "";
+				// loop through each result and get the value
+				for(String r : this.resnames) {
+					res += getResult(r, this, this.subclass) + "\t";
+				}
+				// write params, the timestep, and the results to the timecourse results
+				this.timewriter.write(params + schedule.getSteps() + "\t" + res + "\n");
+				// if this is the end of a run, also add it to end results
+				if(end) {
+					this.endwriter.write(params + res + "\n");
 				}
 			}
-		}
-		return(results);
-	}
-	
-	/*
-	 * Handles individual agent parameters, returns a long string with the parameters for each agent, all separated by commas
-	 */
-	public String getAgentRes() {
-		// initialize the results string
-		String res = "";
-		// go through each agent in the list and check for actual fields
-		for(Object o : this.agents) {
-			//  loop through each result and get the corresponding value
-			for(String r : this.agentres) {
-				res += getResult(r, o, this.agentclass) + ",";
+			// and get individual agent results (if any have been designated)
+			if(this.agentres.length > 0) {
+				// loop through each agent in the list
+				for(int o = 0; o < this.agents.length; o++) {
+					// initialize a string for the results for this agent
+					String res = "";
+					//  loop through each result and get the corresponding value
+					for(String r : this.agentres) {
+						res += getResult(r, this.agents[o], this.agentclass) + "\t";
+					}
+					// write params, the agent's number, and the results to the agent results
+					this.agentwriter.write(params + schedule.getSteps() + "\t" + o + "\t" + res + "\n");
+				}
 			}
+		} catch(IOException e) {
+			System.out.println("Failed to write results to file...");
 		}
-		return res;
 	}
 	
 	/*
 	 * Gets the value of a result parameter for a given object of a given class, and returns it as a string
+	 * Should be modified for special cases in the subclass
 	 */
 	public String getResult(String res, Object o, Class c) {
 		// initialize string to empty
@@ -556,7 +538,7 @@ public abstract class Model extends SimState  {
 			if(this.autoparams || this.autores) {
 				// first store the subclass
 				setClasses();
-				Field[] fields = subclass.getDeclaredFields();
+				Field[] fields = this.subclass.getDeclaredFields();
 				for(int f = 0; f < fields.length; f++) {
 					// make sure each field is a type it can handle
 					Class c = fields[f].getType();
@@ -565,6 +547,11 @@ public abstract class Model extends SimState  {
 				}
 				// and then add agent info at the bottom
 				writer.write("*agentInfo = ");
+				// with all of the agent's fields as suggested results
+				fields = this.agentclass.getDeclaredFields();
+				for(int f = 0; f < fields.length; f++) {
+					writer.write(fields[f].getName() + " ");
+				}
 			}
 			writer.close();
 		} catch (IOException e) {
