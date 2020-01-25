@@ -31,8 +31,10 @@ public abstract class Model extends SimState  {
 	public BufferedWriter timewriter;
 	// file writer for individual agent results (only created if results are provided to be taken)
 	public BufferedWriter agentwriter;
+	// the separator for writing results to file
+	public char sep = ',';
 	// key parameters used in every model (as class variables for access if the user wants them)
-	public static String[] keyparams = {"seed", "steps", "reps", "fname", "testint", "gui"};
+	public static String[] keyparams = {"seed", "sep", "steps", "reps", "fname", "testint", "gui"};
 	public int seed = 0;
 	public int steps;
 	public int reps = 1;
@@ -297,38 +299,42 @@ public abstract class Model extends SimState  {
 			}
 			// make the header for the table
 			// start this next line with a percent sign to comment it out for analysis
-			// and a tab to make space for the seed
-			writer.write("% \t");
-			// if this file will hold time results, add an extra tab to make space for the time
+			// and a separator to make space for the seed
+			writer.write("% " + this.sep);
+			// if this file will hold time results, add an extra separator to make space for the time
 			if(time) {
-				writer.write("\t");
+				writer.write(this.sep);
+			}
+			// and if this file will hold agent results, add an extra separator to make space for the agent
+			if(agent) {
+				writer.write(this.sep);
 			}
 			// indicate the test parameters if there are any
 			if(this.testparams.size() > 0) writer.write("Parameters");
 			// leave enough space for each parameter
-			for(int t = 0; t < this.testparams.size(); t++) writer.write("\t");
+			for(int t = 0; t < this.testparams.size(); t++) writer.write(this.sep);
 			// then indicate categories for the results
 			writer.write("Results\n");
 			// start with the seed
-			writer.write("Seed\t");
+			writer.write("Seed" + this.sep);
 			// if this file will hold time results, add an extra column for the timestep
 			if(time) {
-				writer.write("Timestep\t");
+				writer.write("Timestep" + this.sep);
 			}
 			// then loop through all the test parameters and add headers for each parameter
 			for(int t = 0; t < this.testparams.size(); t++) {
-				writer.write(this.paramnames[this.testparams.get(t)] + "\t");
+				writer.write(this.paramnames[this.testparams.get(t)] + this.sep);
 			}
 			// if this file will hold agent data, add the headers for the categories of agent results
 			if(agent) {
-				writer.write("Agent\t");
+				writer.write("Agent" + this.sep);
 				for(int r = 0; r < this.agentres.length; r++) {
-					writer.write(this.agentres[r] + "\t");
+					writer.write(this.agentres[r] + this.sep);
 				}
 			} else {
 				// otherwise add the headers for the model results
 				for(int r = 0; r < this.resnames.length; r++) {
-					writer.write(this.resnames[r] + "\t");
+					writer.write(this.resnames[r] + this.sep);
 				}
 			}
 			// and then do a line break
@@ -370,10 +376,10 @@ public abstract class Model extends SimState  {
 			// store the seed for this run
 			int s = seed+i;
 			// also store the parameters for this run as a string for writing to file, starting with the seed
-			String p = s + "\t";
+			String p = "" + s + this.sep;
 			// followed by all the parameter values
 			for(int t = 0; t < this.testparams.size(); t++) {
-				p += params.get(this.testparams.get(t)) + "\t";
+				p += params.get(this.testparams.get(t)) + this.sep;
 			}
 			// reseed with the seed parameter, plus the replication number
 			random.setSeed(s);
@@ -465,10 +471,10 @@ public abstract class Model extends SimState  {
 				String res = "";
 				// loop through each result and get the value
 				for(String r : this.resnames) {
-					res += getResult(r, this, this.subclass) + "\t";
+					res += getResult(r, this, this.subclass) + this.sep;
 				}
 				// write params, the timestep, and the results to the timecourse results
-				this.timewriter.write(params + schedule.getSteps() + "\t" + res + "\n");
+				this.timewriter.write(params + schedule.getSteps() + this.sep + res + "\n");
 				// if this is the end of a run, also add it to end results
 				if(end) {
 					this.endwriter.write(params + res + "\n");
@@ -482,10 +488,10 @@ public abstract class Model extends SimState  {
 					String res = "";
 					//  loop through each result and get the corresponding value
 					for(String r : this.agentres) {
-						res += getResult(r, this.agents[o], this.agentclass) + "\t";
+						res += getResult(r, this.agents[o], this.agentclass) + this.sep;
 					}
 					// write params, the agent's number, and the results to the agent results
-					this.agentwriter.write(params + schedule.getSteps() + "\t" + o + "\t" + res + "\n");
+					this.agentwriter.write(params + schedule.getSteps() + this.sep + o + this.sep + res + "\n");
 				}
 			}
 		} catch(IOException e) {
