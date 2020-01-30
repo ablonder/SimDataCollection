@@ -129,6 +129,7 @@ public abstract class Model extends SimState  {
 			while((line = file.readLine()) != null) {
 				// split each line at the equals sign
 				String[] splitline = line.split("=");
+				// TODO - account for lines without "="
 				// first catch agentInfo (which should be a key parameter)
 				if(this.autores && splitline[0].trim().equals("*agentInfo") && splitline[1].length() > 1) {
 					// split the parameters to get the data gathered from each agent
@@ -375,8 +376,8 @@ public abstract class Model extends SimState  {
 			setParams(params.toArray(new String[params.size()]));
 			// store the seed for this run
 			int s = seed+i;
-			// also store the parameters for this run as a string for writing to file, starting with the seed
-			String p = "" + s + this.sep;
+			// also store the parameters for this run as a string for writing to file
+			String p = "";
 			// followed by all the parameter values
 			for(int t = 0; t < this.testparams.size(); t++) {
 				p += params.get(this.testparams.get(t)) + this.sep;
@@ -389,12 +390,12 @@ public abstract class Model extends SimState  {
 			while(schedule.getSteps() < steps) {
 				// if this is the right step according to the test interval, write the results for this step
 				if(schedule.getSteps()%testint == 0) {
-					writeResults(p, false);
+					writeResults(s, p, false);
 				}
 				if (!schedule.step(this)) break;
 			}
 			// get the end results once it's all done
-			writeResults(p, true);
+			writeResults(s, p, true);
 			finish();
 		}
 	}
@@ -460,7 +461,7 @@ public abstract class Model extends SimState  {
 	/*
 	 * writes results to file after the test interval
 	 */
-	public void writeResults(String params, boolean end) {
+	public void writeResults(int s, String params, boolean end) {
 		// first get the subclass and agent class
 		setClasses();
 		// surround it all with a try catch for the file writing
@@ -473,11 +474,11 @@ public abstract class Model extends SimState  {
 				for(String r : this.resnames) {
 					res += getResult(r, this, this.subclass) + this.sep;
 				}
-				// write params, the timestep, and the results to the timecourse results
-				this.timewriter.write(params + schedule.getSteps() + this.sep + res + "\n");
+				// write the seed, timestep, params, and results to the timecourse results
+				this.timewriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + res + "\n");
 				// if this is the end of a run, also add it to end results
 				if(end) {
-					this.endwriter.write(params + res + "\n");
+					this.endwriter.write("" + s + this.sep + params + res + "\n");
 				}
 			}
 			// and get individual agent results (if any have been designated)
@@ -491,7 +492,7 @@ public abstract class Model extends SimState  {
 						res += getResult(r, this.agents[o], this.agentclass) + this.sep;
 					}
 					// write params, the agent's number, and the results to the agent results
-					this.agentwriter.write(params + schedule.getSteps() + this.sep + o + this.sep + res + "\n");
+					this.agentwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + o + this.sep + res + "\n");
 				}
 			}
 		} catch(IOException e) {
