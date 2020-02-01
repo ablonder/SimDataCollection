@@ -6,17 +6,26 @@ library(gridExtra)
 # generates line graphs or bar plots (as applicable) of the results provided based on:
 # dtable - data frame of results, with columns for each parameter to split/graph by, and each category of results
 # params - vector of column names to split/graph:
-#   the lines/bars will be colored based on the last column listed
-#   the x-axis will be based on the second to last column listed
-#   the data will be split into graphs based on all the other columns (it will create one graph for each combination of values)
+#   one graph will be created for each combination of values in the columns listed
+#   the second to last column listed will be used to create the x-axis
+#   the last string in the vector may be multiple column names separated by spaces
+#     if linelabels have been provided, the first column name is used to determine the line pattern
+#     if shapelabels have been provided, the next column name is used to determine the shape of the points
+#     any remaining column names are concatenated and used to color the lines/points/bars
 # fname - the beginning of the name of all the outputted files
-#   it will add on all the names of the parameters split by and their values for each graph
-# testvars - list of vectors of column names to plot together (y values) on the same graph
+#   each graph's name will consist of fname, followed by the names and values of the parameters used to split the data
+# testvars - list of vectors of column names to plot together (as y-values) on the same graph
 #   can be used to color the graph or for the x-axis if included in params as "category"
-# testlabels - vector of labels for the y-axis of each graph, should be the same length as testvars
-# catlabels - vector of labels for the colors of each graph, should be the same length as testvars
+# testlabels - vector of labels for the y-axis of each graph, should be one or the same length as testvars
+# catlabels - vector of labels for the colors of each graph, should be one or the same length as testvars
+# scatter - whether a scatter plot is returned, or the data is averaged over to make a barplot/linegraph
+# linelabels - vector of labels for the line patterns of each graph, should be one or the same length as testvars
+# shapelables - vector of labels for the point shapes of each graph, should be one or the same length as testvars
+# savelv - how many parameter combinations should be included in the same facetted plot, maximum 4
+# pointsize - whether points should be scaled according to the number of values averaged to create them
+# errorbars - whether linegraphs or barplots should include error bars
 plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, 
-                       linelabels = c(), shapelabels = c(), savelv = 2){
+                       linelabels = c(), shapelabels = c(), savelv = 2, pointsize = F, errorbars = F){
   if(length(params) == savelv){
     # loop through each set of measures to crete the corresponding plots
     for(v in 1:length(testvars)) {
@@ -63,7 +72,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       } else {
         llab = ""
       }
-      # if there are more categories left, combine them for use as the color
+      # if there are more categories left, use them to color the graph
       if(length(cats) >= j) {
         for(i in j:length(cats)){
           plotd$c = paste(plotd$c, plotd[, cats[i]])
@@ -95,11 +104,21 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
           geom_smooth(method = 'lm', se = F)
       } else if(is.numeric(plotd$x)){
         # otherwise, if the x-axis is numeric, turn this into a linegraph
+        # if the points are scaled by number of points, do that here
+        ## TODO - get the points to actually be smaller when pointsize is off
+        ps = .5
+        if(pointsize){
+          plotd$ps = plotd$N/sum(plotd$N)
+        }
+        # also toggle error bars by getting rid of standard error
+        if(!errorbars){
+          plotd$se = 0
+        }
         plot = ggplot(plotd, aes(x = x, y = mean, colour = c)) +
           geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) + geom_line(aes(linetype = l)) +
-          geom_point(aes(shape = s)) + ylab(testlabels[v]) + xlab(params[length(params)-1]) +
+          geom_point(aes(shape = s, size = ps)) + ylab(testlabels[v]) + xlab(params[length(params)-1]) +
           labs(colour = params[length(params)]) +
-          guides(colour=guide_legend(title=clab), shape=guide_legend(title=slab), linetype=guide_legend(title = llab))
+          guides(colour=guide_legend(title=clab), shape=guide_legend(title=slab), linetype=guide_legend(title = llab), size = "none")
       } else {
         # otherwise, turn it into a bargraph
         plot = ggplot(plotd, aes(x = x, y = mean, fill = c)) +
