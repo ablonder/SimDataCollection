@@ -130,8 +130,14 @@ public abstract class Model extends SimState  {
 				// split each line at the equals sign
 				String[] splitline = line.split("=");
 				// TODO - account for lines without "="
-				// first catch agentInfo (which should be a key parameter)
-				if(this.autores && splitline[0].trim().equals("*agentInfo") && splitline[1].length() > 1) {
+				// first check for lines without anything after the equals, or no equals at all
+				if(splitline.length < 2 || splitline[1].trim().length() < 1) {
+					// if there's actually something there and we're automatically gathering results, do that
+					if(this.autores && splitline[0].length() > 0) {
+						tempres.add(splitline[0].trim());
+					}
+				} else if(this.autores && splitline[0].trim().equals("*agentInfo") && splitline[1].length() > 1) {
+					// otherwise, try to catch agentInfo (which should be a key parameter)
 					// split the parameters to get the data gathered from each agent
 					ArrayList<String> newagentres = new ArrayList<String>(Arrays.asList(splitline[1].trim().split(" ")));
 					// grab the existing list of agent parameters
@@ -152,10 +158,6 @@ public abstract class Model extends SimState  {
 						// and the second part to the list of parameter values (via tempvals)
 						tempvals.add(splitline[1].trim());
 					}
-				} else if(splitline[1].length() <= 1 && this.autores) {
-					// otherwise, if there's nothing after the equals sign
-					// and it's supposed to automatically get the results categories, add those
-					tempres.add(splitline[0].trim());
 				}
 			}
 			// now these lists can become/be added to the official lists
