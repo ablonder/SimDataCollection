@@ -218,13 +218,13 @@ public abstract class Model extends SimState  {
 					this.endwriter = new BufferedWriter(new FileWriter(this.fname+"endresults.txt"));
 					this.timewriter = new BufferedWriter(new FileWriter(this.fname + "timeresults.txt"));
 					// and write in a header
-					makeHeader(this.endwriter, false, false);
-					makeHeader(this.timewriter, true, false);
+					makeHeader(this.endwriter, false, false, this.resnames);
+					makeHeader(this.timewriter, true, false, this.resnames);
 				}
 				// if there are agent results, also create a file to hold those
 				if(this.agentres.length > 0) {
 					this.agentwriter = new BufferedWriter(new FileWriter(this.fname + "agentresults.txt"));
-					makeHeader(this.agentwriter, true, true);
+					makeHeader(this.agentwriter, true, true, this.agentres);
 				}
 			} catch(IOException e) {
 				System.out.println("Something's wrong with your results files!");
@@ -278,7 +278,7 @@ public abstract class Model extends SimState  {
 	/*
 	 * Writes the header for a results file
 	 */
-	public void makeHeader(BufferedWriter writer, boolean time, boolean agent) {
+	public void makeHeader(BufferedWriter writer, boolean time, boolean agent, String[] res) {
 		try {
 			// start with the base parameters
 			writer.write("% Base Parameters: ");
@@ -331,14 +331,10 @@ public abstract class Model extends SimState  {
 			// if this file will hold agent data, add the headers for the categories of agent results
 			if(agent) {
 				writer.write("Agent" + this.sep);
-				for(int r = 0; r < this.agentres.length; r++) {
-					writer.write(this.agentres[r] + this.sep);
-				}
-			} else {
-				// otherwise add the headers for the model results
-				for(int r = 0; r < this.resnames.length; r++) {
-					writer.write(this.resnames[r] + this.sep);
-				}
+			}
+			// add the headers for all the results
+			for(int r = 0; r < res.length; r++) {
+				writer.write(res[r] + this.sep);
 			}
 			// and then do a line break
 			writer.write("\n");
