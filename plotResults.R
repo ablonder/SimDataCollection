@@ -9,8 +9,8 @@ library(gridExtra)
 #   one graph will be created for each combination of values in the columns listed
 #   the second to last column listed will be used to create the x-axis
 #   the last string in the vector may be multiple column names separated by spaces
-#     if linelabels have been provided, the first column name is used to determine the line pattern
-#     if shapelabels have been provided, the next column name is used to determine the shape of the points
+#     if shapelabels have been provided, the first column name is used to determine the shape of the points
+#     if linelabels have been provided, the next column name is used to determine the line pattern
 #     any remaining column names are concatenated and used to color the lines/points/bars
 # fname - the beginning of the name of all the outputted files
 #   each graph's name will consist of fname, followed by the names and values of the parameters used to split the data
@@ -25,7 +25,8 @@ library(gridExtra)
 # pointsize - whether points should be scaled according to the number of values averaged to create them
 # errorbars - whether linegraphs or barplots should include error bars
 plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, 
-                       linelabels = c(), shapelabels = c(), savelv = 2, pointsize = F, errorbars = F){
+                       linelabels = c(), shapelabels = c(), savelv = 2, pointsize = F, errorbars = F,
+                       colorlegend = T, linelegend = T, shapelegend = T){
   if(length(params) == savelv){
     # loop through each set of measures to crete the corresponding plots
     for(v in 1:length(testvars)) {
@@ -95,36 +96,61 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
                           sd = sd(measure, na.rm = T), se = sd / sqrt(N))
         plotd = as.data.frame(plotd)
       }
-      # plot the results
-      # create a scatter plot if scatter is true
-      if(scatter){
-        plot = ggplot(plotd, aes(x = x, y = measure, colour = c)) + geom_point(aes(shape = s)) +
-          ylab(testlabels[v]) + xlab(params[length(params)-1]) + labs(colour = params[length(params)]) +
-          guides(colour=guide_legend(title=clab), shape=guide_legend(title=slab)) +
-          geom_smooth(method = 'lm', se = F)
-      } else if(is.numeric(plotd$x)){
-        # otherwise, if the x-axis is numeric, turn this into a linegraph
-        # if the points are scaled by number of points, do that here
-        ## TODO - get the points to actually be smaller when pointsize is off
-        ps = .5
-        if(pointsize){
-          plotd$ps = plotd$N/sum(plotd$N)
-        }
-        # also toggle error bars by getting rid of standard error
-        if(!errorbars){
-          plotd$se = 0
-        }
-        plot = ggplot(plotd, aes(x = x, y = mean, colour = c)) +
-          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) + geom_line(aes(linetype = l)) +
-          geom_point(aes(shape = s, size = ps)) + ylab(testlabels[v]) + xlab(params[length(params)-1]) +
-          labs(colour = params[length(params)]) +
-          guides(colour=guide_legend(title=clab), shape=guide_legend(title=slab), linetype=guide_legend(title = llab), size = "none")
+      # toggle legends
+      if(colorlegend){
+        cleg = guide_legend(title=clab)
       } else {
+        cleg = F
+      }
+      if(linelegend){
+        lleg = guide_legend(title = llab)
+      } else {
+        lleg = F
+      }
+      if(shapelegend){
+        sleg = guide_legend(title = slab)
+      } else {
+        sleg = F
+      }
+      # plot the results
+      if(is.numeric(plotd$x)){
+        # create a scatter plot if scatter is true
+        if(scatter){
+          plot = ggplot(plotd, aes(x = x, y = measure, colour = c)) + geom_point(aes(shape = s)) +
+            ylab(testlabels[v]) + xlab(params[length(params)-1]) + labs(colour = params[length(params)]) +
+            guides(colour=cleg, shape=sleg) +
+            geom_smooth(method = 'lm', se = F)
+        } else {
+        # otherwise turn this into a linegraph
+          # if the points are scaled by number of points, do that here
+          ## TODO - get the points to actually be smaller when pointsize is off
+          ps = 0
+          if(pointsize){
+            plotd$ps = plotd$N/sum(plotd$N)
+          }
+          # also toggle error bars by getting rid of standard error
+          if(!errorbars){
+            plotd$se = 0
+          }
+          plot = ggplot(plotd, aes(x = x, y = mean, colour = c)) +
+            geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) + geom_line(aes(linetype = l)) +
+            geom_point(aes(shape = s, size = ps)) + ylab(testlabels[v]) + xlab(params[length(params)-1]) +
+            labs(colour = params[length(params)]) +
+            guides(colour=cleg, shape=sleg, linetype=lleg, size = "none")
+        }
+      } else {
+        if(scatter){
+          # if this is a factor scatter plot, make a box plot
+          plot = ggplot(plotd, aes(x = x, y = measure)) + geom_boxplot() + 
+            geom_jitter(aes(colour = c, shape = s, alpha = 1/length(plotd)), width = .01) + ylab(testlabels[v]) + xlab(params[length(params)-1]) +
+            labs(colour = params[length(params)]) + guides(colour=cleg, shape=sleg, alpha = "none")
+        } else {
         # otherwise, turn it into a bargraph
-        plot = ggplot(plotd, aes(x = x, y = mean, fill = c)) +
-          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, position=position_dodge(.9)) +
-          geom_bar(stat = "identity", position = "dodge") + ylab(testlabels[v]) + xlab(params[length(params)-1]) + 
-          labs(fill = params[length(params)]) + guides(fill=guide_legend(title=clab))
+          plot = ggplot(plotd, aes(x = x, y = mean, fill = c)) +
+            geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(.9)) +
+            geom_bar(stat = "identity", position = "dodge") + ylab(testlabels[v]) + xlab(params[length(params)-1]) + 
+            labs(fill = params[length(params)]) + guides(fill=cleg) + geom_point()
+        }
       }
       # if the save level is higher than 2, make a grid of grids for all the remaining parameters
       # if the save level is 3, just make a single row
@@ -135,7 +161,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
         plot = plot + facet_grid(rows = vars(plotd[, params[(length(params)-2)]]),
                           cols = vars(plotd[, params[(length(params)-3)]]))
       }
-      ggsave(paste(fname, testlabels[v], ".png", sep = ""), plot = plot)
+      ggsave(paste(fname, testvars[v], ".png", sep = ""), plot = plot)
     }
   } else {
     # otherwise, recurse on all values of this parameter
@@ -144,7 +170,8 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       f = paste(fname, params[1], v, sep = "")
       # get the corresponding plot/grid of plots
       plotResults(dtable[dtable[, params[1]] == v, ], params[-1], f, testvars, testlabels, catlabels,
-                    scatter, linelabels = linelabels, shapelabels = shapelabels, savelv = savelv)
+                  scatter, linelabels = linelabels, shapelabels = shapelabels, savelv = savelv,
+                  colorlegend = colorlegend, linelegend = linelegend, shapelegend = shapelegend)
     }
   }
 }

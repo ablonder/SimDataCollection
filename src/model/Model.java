@@ -576,7 +576,7 @@ public abstract class Model extends SimState  {
 	}
 	
 	/*
-	 * Splits input file parsed into args based on provided parameters
+	 * Splits input file parsed into args (the output of readFile) based on provided parameters
 	 */
 	public void splitFile(String fname, String fext, String[] splitparams, String[] splitkeys, String[] args) {
 		// if all elements have been removed from split params, create a file
