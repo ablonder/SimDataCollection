@@ -15,6 +15,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 
+import ec.util.MersenneTwisterFast;
 import sim.engine.*;
 
 public abstract class Model extends SimState  {
@@ -25,6 +26,8 @@ public abstract class Model extends SimState  {
 	public ArrayList<Integer> testparams = new ArrayList<Integer>();
 	// initialize empty nested array of test parameter values
 	public ArrayList<ArrayList<String>> testvals = new ArrayList<ArrayList<String>>();
+	// initialize empty array of parameters to randomize
+	public ArrayList<Integer> randparams = new ArrayList<Integer>();
 	// file writer for the end of run results
 	public BufferedWriter endwriter;
 	// file writer for timecourse results taken at the indicated interval
@@ -34,9 +37,10 @@ public abstract class Model extends SimState  {
 	// the separator for writing results to file
 	public char sep = ',';
 	// key parameters used in every model (as class variables for access if the user wants them)
-	public static String[] keyparams = {"seed", "sep", "steps", "reps", "fname", "testint", "gui"};
+	public static String[] keyparams = {"seed", "sep", "steps", "iters", "reps", "fname", "testint", "gui"};
 	public int seed = 0;
 	public int steps;
+	public int iters = 1;
 	public int reps = 1;
 	public String fname = "";
 	public int testint;
@@ -129,7 +133,6 @@ public abstract class Model extends SimState  {
 			while((line = file.readLine()) != null) {
 				// split each line at the equals sign
 				String[] splitline = line.split("=");
-				// TODO - account for lines without "="
 				// first check for lines without anything after the equals, or no equals at all
 				if(splitline.length < 2 || splitline[1].trim().length() < 1) {
 					// if there's actually something there and we're automatically gathering results, do that
@@ -231,14 +234,30 @@ public abstract class Model extends SimState  {
 				System.exit(0);
 			}
 			try {
-				// if there are no test params, just test
-				if(this.testparams.size() == 0) {
-					// test the model for the given seed, number of steps, replications,
-					// and the test interval
-					test(new ArrayList<String>(Arrays.asList(this.params)));
-				} else {
-					// otherwise sweep
-					sweep(new ArrayList<String>(Arrays.asList(this.params)), 0);
+				// draw random parameters for a set number of iterations (from a separate random seed), and then sweep/test in each
+				MersenneTwisterFast paramgen = new MersenneTwisterFast();
+				paramgen.setSeed(this.seed);
+				for(int i = 0; i < this.iters; i++) {
+					// create a new list that's a copy of params to put the rand params into
+					ArrayList<String> iterparams = new ArrayList<String>(Arrays.asList(this.params));
+					// randomly draw all the randparams
+					for(int r = 0; r < this.randparams.size(); r++) {
+						double val = parseRand(paramgen, this.params[this.randparams.get(r)]);
+						// if that's NaN, something didn't work, and print out a message, but keep going
+						if(Double.isNaN(val)) {
+							System.out.println("Random parameter not formatted correctly.");
+						}
+						iterparams.set(this.randparams.get(r), String.valueOf(val));
+					}
+					// then, if there are no test params, just test
+					if(this.testparams.size() == 0) {
+						// test the model for the given seed, number of steps, replications,
+						// and the test interval
+						test(iterparams);
+					} else {
+						// otherwise sweep
+						sweep(iterparams, 0);
+					}
 				}
 			} catch (NumberFormatException e) {
 				System.out.println("Error in Runner: Constructor! Make sure all the parameters are the right type!");
@@ -262,17 +281,52 @@ public abstract class Model extends SimState  {
 	 * parses inputed strings into lists of variables
 	 */
 	public void parse(int param, String val) {
-		// split the value between spaces
-		String[] vals = val.split(" ");
-		// the first value is the starting value of that parameter
-		this.params[param] = vals[0];
-		// if there are more values provided store them for testing
-		if(vals.length > 1) {
-			// first store this parameter
-			this.testparams.add(param);
-			// then store the remaining values
-			this.testvals.add((new ArrayList<String>(Arrays.asList(vals))));
+		// first check to see if it's to be randomly drawn (if the parser doesn't return Not a Number)
+		if(!Double.isNaN(parseRand(this.random, val))) {
+			// then add it to randparams
+			this.randparams.add(param);
+			// and just leave its value the same
+			this.params[param] = val;
+		} else {
+			// otherwise, check to see if its a test value (for now these are mutually exclusive)
+			// split the value between spaces
+			String[] vals = val.split(" ");
+			// the first value is the starting value of that parameter
+			this.params[param] = vals[0];
+			// if there are more values provided store them for testing
+			if(vals.length > 1) {
+				// first store this parameter
+				this.testparams.add(param);
+				// then store the remaining values
+				this.testvals.add((new ArrayList<String>(Arrays.asList(vals))));
+			}
 		}
+	}
+	
+	/*
+	 * parses and randomly draws such parameters (if the code is invalid, it returns NaN)
+	 */
+	public double parseRand(MersenneTwisterFast rand, String code) {
+		// first strip the code
+		code = code.trim();
+		// then grab the distribution (which should be a letter, so  far N for normal, U for uniform, and I'll add things as I see fit)
+		char dist = code.charAt(0);
+		// then the rest can be stripped of parentheses (which should be around the parameters) and split around the comma between them
+		String[] distparams = code.substring(1).replaceAll("[()]", "").split(",");
+		// now I'm going to assume they're doubles, and if that fails, return NaN, to show  it failed
+		try {
+			switch(dist) {
+			case 'N':
+				// normal with mean and standard deviation
+				return rand.nextGaussian()*Double.parseDouble(distparams[1]) + Double.parseDouble(distparams[0]);
+			case 'U':
+				// uniform with min and max
+				return rand.nextDouble()*(Double.parseDouble(distparams[1])-Double.parseDouble(distparams[0])) + Double.parseDouble(distparams[0]);
+			}
+		}catch(NumberFormatException e) {
+			// this and a few other things will result in returning NaN
+		}
+		return Double.NaN;
 	}
 
 	/*
@@ -291,6 +345,15 @@ public abstract class Model extends SimState  {
 			}
 			// new line
 			writer.write("\n\n");
+			// list random parameters
+			writer.write("% Random Parameters: \n");
+			// loop through each random parameter and its distribution
+			for(int r = 0; r < this.randparams.size(); r++) {
+				writer.write("%" + paramnames[this.randparams.get(r)]);
+				writer.write(" = ");
+				writer.write(this.params[this.randparams.get(r)]);
+				writer.write("\n");
+			}
 			// Now for the test parameters
 			writer.write("% Test Parameters:\n");
 			// loop through each test parameter and its values
@@ -312,8 +375,12 @@ public abstract class Model extends SimState  {
 			if(agent) {
 				writer.write(this.sep);
 			}
-			// indicate the test parameters if there are any
-			if(this.testparams.size() > 0) writer.write("Parameters");
+			// indicate the random parameters
+			if(this.randparams.size() > 0) writer.write("Random Parameters");
+			// then leave enough space for each parameter
+			for(int r = 0; r < this.randparams.size(); r++) writer.write(this.sep);
+			// and indicate the test parameters if there are any
+			if(this.testparams.size() > 0) writer.write("Test Parameters");
 			// leave enough space for each parameter
 			for(int t = 0; t < this.testparams.size(); t++) writer.write(this.sep);
 			// then indicate categories for the results
@@ -323,6 +390,10 @@ public abstract class Model extends SimState  {
 			// if this file will hold time results, add an extra column for the timestep
 			if(time) {
 				writer.write("Timestep" + this.sep);
+			}
+			// loop through all the random parameters and add headers for each
+			for(int r = 0; r < this.randparams.size(); r++) {
+				writer.write(this.paramnames[this.randparams.get(r)] + this.sep);
 			}
 			// then loop through all the test parameters and add headers for each parameter
 			for(int t = 0; t < this.testparams.size(); t++) {
@@ -368,18 +439,21 @@ public abstract class Model extends SimState  {
 	 */
 	public void test(ArrayList<String> params) {
 		System.out.println(params.toString());
+		// store the parameters for this run as a string for writing to file
+		String p = "";
+		// followed by all the random and test parameter values
+		for(int r = 0; r < this.randparams.size(); r++) {
+			p += params.get(this.randparams.get(r)) + this.sep;
+		}
+		for(int t = 0; t < this.testparams.size(); t++) {
+			p += params.get(this.testparams.get(t)) + this.sep;
+		}
 		// run the same simulation for the designated number of replications
 		for(int i = 0; i < reps; i++) {
 			// set model parameters from args (needs to be done fresh each time or they can build)
 			setParams(params.toArray(new String[params.size()]));
 			// store the seed for this run
 			int s = seed+i;
-			// also store the parameters for this run as a string for writing to file
-			String p = "";
-			// followed by all the parameter values
-			for(int t = 0; t < this.testparams.size(); t++) {
-				p += params.get(this.testparams.get(t)) + this.sep;
-			}
 			// reseed with the seed parameter, plus the replication number
 			random.setSeed(s);
 			// start the simulation
@@ -431,7 +505,7 @@ public abstract class Model extends SimState  {
 		this.agents = new Object[0];
 		// loop through all named parameters
 		for(int p = 0; p < paramnames.length; p++) {
-			// if that parameter is an actual field, assign its value based on params
+			// if that parameter is an actual field, assign its value based on params (or do what the user changes it to do)
 			setParamVal(subclass, paramnames[p], params[p]);
 		}
 	}
@@ -446,7 +520,17 @@ public abstract class Model extends SimState  {
 			Class t = f.getType();
 			if(t == String.class) f.set(this, pval);
 			else if(t == Integer.TYPE) f.setInt(this, Integer.parseInt(pval));
-			else if(t == Double.TYPE) f.setDouble(this, Double.parseDouble(pval));
+			else if(t == Double.TYPE) {
+				// if the provided value parses as instructions for drawing randomly set it as that instead (only works for doubles)
+				double draw = parseRand(this.random, pval);
+				if(!Double.isNaN(draw)) {
+					f.setDouble(this, draw);
+					System.out.println(draw);
+				} else {
+					// otherwise just try to use the value provided
+					f.setDouble(this, Double.parseDouble(pval));
+				}
+			}
 			else if(t == Boolean.TYPE) f.setBoolean(this, Boolean.parseBoolean(pval));
 			else if(t == Character.TYPE) f.setChar(this, pval.charAt(0));
 		} catch(NoSuchFieldException e) {
@@ -630,6 +714,24 @@ public abstract class Model extends SimState  {
 						Arrays.copyOfRange(splitkeys, 1, splitkeys.length), newargs);
 			}
 		}
+	}
+	
+	/*
+	 * helper utility to  draw a random value from a normal distribution within a certain range using a while-loop
+	 */
+	public double drawRange(double val, double var, double min, double max) {
+		boolean within = false;
+		double draw = 0;
+		while(!within) {
+			// draw variance from a normal distribution
+			draw = this.random.nextGaussian()*var;
+			// check to see if its in the right range;
+			if(val+draw >= min && val+draw <= max) {
+				within = true;
+			}
+		}
+		// once a reasonable value has been found, return it
+		return draw+val;
 	}
 
 }
