@@ -17,6 +17,8 @@ import java.util.Arrays;
 
 import ec.util.MersenneTwisterFast;
 import sim.engine.*;
+import sim.util.distribution.Beta;
+import sim.util.distribution.Distributions;
 
 public abstract class Model extends SimState  {
 
@@ -210,8 +212,7 @@ public abstract class Model extends SimState  {
 			// otherwise create an output file and sweep
 			// start by making sure all the necessary key parameters are there
 			if(steps == 0 || reps == 0 || testint == 0) {
-				System.out.println("Missing key parameters for running without GUI "
-						+ "(steps, reps, or testint)!");
+				System.out.println("Missing key parameters for running without GUI (steps, reps, or testint)!");
 				System.exit(0);
 			}
 			try {
@@ -233,35 +234,30 @@ public abstract class Model extends SimState  {
 				System.out.println("Something's wrong with your results files!");
 				System.exit(0);
 			}
-			try {
-				// draw random parameters for a set number of iterations (from a separate random seed), and then sweep/test in each
-				MersenneTwisterFast paramgen = new MersenneTwisterFast();
-				paramgen.setSeed(this.seed);
-				for(int i = 0; i < this.iters; i++) {
-					// create a new list that's a copy of params to put the rand params into
-					ArrayList<String> iterparams = new ArrayList<String>(Arrays.asList(this.params));
-					// randomly draw all the randparams
-					for(int r = 0; r < this.randparams.size(); r++) {
-						double val = parseRand(paramgen, this.params[this.randparams.get(r)]);
-						// if that's NaN, something didn't work, and print out a message, but keep going
-						if(Double.isNaN(val)) {
-							System.out.println("Random parameter not formatted correctly.");
-						}
-						iterparams.set(this.randparams.get(r), String.valueOf(val));
+			// draw random parameters for a set number of iterations (from a separate random seed), and then sweep/test in each
+			MersenneTwisterFast paramgen = new MersenneTwisterFast();
+			paramgen.setSeed(this.seed);
+			for(int i = 0; i < this.iters; i++) {
+				// create a new list that's a copy of params to put the rand params into
+				ArrayList<String> iterparams = new ArrayList<String>(Arrays.asList(this.params));
+				// randomly draw all the randparams
+				for(int r = 0; r < this.randparams.size(); r++) {
+					double val = parseRand(paramgen, this.params[this.randparams.get(r)]);
+					// if that's NaN, something didn't work, and print out a message, but keep going
+					if(Double.isNaN(val)) {
+						System.out.println("Random parameter not formatted correctly.");
 					}
-					// then, if there are no test params, just test
-					if(this.testparams.size() == 0) {
-						// test the model for the given seed, number of steps, replications,
-						// and the test interval
-						test(iterparams);
-					} else {
-						// otherwise sweep
-						sweep(iterparams, 0);
-					}
+					iterparams.set(this.randparams.get(r), String.valueOf(val));
 				}
-			} catch (NumberFormatException e) {
-				System.out.println("Error in Runner: Constructor! Make sure all the parameters are the right type!");
-				System.exit(0);
+				// then, if there are no test params, just test
+				if(this.testparams.size() == 0) {
+					// test the model for the given seed, number of steps, replications,
+					// and the test interval
+					test(iterparams);
+				} else {
+					// otherwise sweep
+					sweep(iterparams, 0);
+				}
 			}
 			try {
 				if(this.resnames.length > 0) {
@@ -307,13 +303,15 @@ public abstract class Model extends SimState  {
 	 * parses and randomly draws such parameters (if the code is invalid, it returns NaN)
 	 */
 	public double parseRand(MersenneTwisterFast rand, String code) {
-		// first strip the code
-		code = code.trim();
-		// then grab the distribution (which should be a letter, so  far N for normal, U for uniform, and I'll add things as I see fit)
+		// first remove all whitespace
+		code = code.replaceAll(" ", "");
+		// then grab the distribution (which should be a letter: N for normal, U for uniform, and C for choice)
 		char dist = code.charAt(0);
-		// then the rest can be stripped of parentheses (which should be around the parameters) and split around the comma between them
-		String[] distparams = code.substring(1).replaceAll("[()]", "").split(",");
-		// now I'm going to assume they're doubles, and if that fails, return NaN, to show  it failed
+		// make sure there are parentheses, so I'm not just taking random things and declaring them to be random draws
+		if(code.length() < 4 || code.charAt(1) != '(' || code.charAt(code.length()-1) != ')') return Double.NaN;
+		// then split parameters within the parentheses using commas
+		String[] distparams = code.substring(2,code.length()-1).split(",");
+		// now I'm going to assume the values inside are doubles, and if that fails, return NaN, to show  it failed
 		try {
 			switch(dist) {
 			case 'N':
@@ -322,6 +320,16 @@ public abstract class Model extends SimState  {
 			case 'U':
 				// uniform with min and max
 				return rand.nextDouble()*(Double.parseDouble(distparams[1])-Double.parseDouble(distparams[0])) + Double.parseDouble(distparams[0]);
+			case 'C':
+				// choice between a provided number of options (mostly used for a coin flip on binary variables) 
+				return rand.nextInt(Integer.parseInt(distparams[0]));
+			case 'E':
+				// Erlang distribution, for things that are generally small (but above 0), with some larger values (based on variance and mean)
+				double draw = Distributions.nextErlang(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), rand);
+				// if there's a third parameter, that's a scale multiplier (struggles with large values - algorithm runs mean^2/var iterations)
+				// (scale by dividing mean and sd by a constant, convert sd to variance by squaring, and then scale back up the result)
+				if(distparams.length > 2) draw *= Double.parseDouble(distparams[2]);
+				return draw;
 			}
 		}catch(NumberFormatException e) {
 			// this and a few other things will result in returning NaN
@@ -461,6 +469,7 @@ public abstract class Model extends SimState  {
 			// run the simulation for the designated number of steps
 			while(schedule.getSteps() < steps) {
 				// if this is the right step according to the test interval, write the results for this step
+				// TODO - give it the option to delay when it starts collecting data
 				if(schedule.getSteps()%testint == 0) {
 					writeResults(s, p, false);
 				}
@@ -518,25 +527,30 @@ public abstract class Model extends SimState  {
 		try{
 			Field f = c.getField(pname);
 			Class t = f.getType();
-			if(t == String.class) f.set(this, pval);
-			else if(t == Integer.TYPE) f.setInt(this, Integer.parseInt(pval));
-			else if(t == Double.TYPE) {
-				// if the provided value parses as instructions for drawing randomly set it as that instead (only works for doubles)
-				double draw = parseRand(this.random, pval);
-				if(!Double.isNaN(draw)) {
-					f.setDouble(this, draw);
-					System.out.println(draw);
-				} else {
-					// otherwise just try to use the value provided
-					f.setDouble(this, Double.parseDouble(pval));
-				}
+			// if the provided value parses as instructions for drawing randomly, do that instead
+			double draw = parseRand(this.random, pval);
+			if(!Double.isNaN(draw)) {
+				pval = Double.toString(draw);
+				System.out.println(draw);
 			}
-			else if(t == Boolean.TYPE) f.setBoolean(this, Boolean.parseBoolean(pval));
+			if(t == String.class) f.set(this, pval);
+			else if(t == Integer.TYPE) f.setInt(this, (int) Double.parseDouble(pval));
+			else if(t == Double.TYPE) f.setDouble(this, Double.parseDouble(pval));
+			else if(t == Boolean.TYPE) {
+				// if the provided value is actually 0 or 1, convert that to true or false
+				if(pval.charAt(0) == '0') pval = "false";
+				else if(pval.charAt(0) == '1') pval = "true";
+				// then actually set the value
+				f.setBoolean(this, Boolean.parseBoolean(pval));
+			}
 			else if(t == Character.TYPE) f.setChar(this, pval.charAt(0));
 		} catch(NoSuchFieldException e) {
 			// that's okay, the user can decide to do other things with it
 		} catch (IllegalAccessException e) {
 			// this is also okay
+		} catch (NumberFormatException e) {
+			// this is hypothetically okay, though it should tell the user
+			System.out.println("Unable to set " + pname + " to " + pval + ": Number Format Exception!");
 		}
 	}
 
@@ -718,6 +732,7 @@ public abstract class Model extends SimState  {
 	
 	/*
 	 * helper utility to  draw a random value from a normal distribution within a certain range using a while-loop
+	 * TODO - phase out
 	 */
 	public double drawRange(double val, double var, double min, double max) {
 		boolean within = false;
@@ -732,6 +747,25 @@ public abstract class Model extends SimState  {
 		}
 		// once a reasonable value has been found, return it
 		return draw+val;
+	}
+	
+	/*
+	 * helper utility to draw a random value from a nicely shaped Erlang distribution (based around mode and standard deviation)
+	 */
+	public double drawErlang(double mode, double sd) {
+		double v = Math.pow(2*sd, 2);
+		double m = (1+Math.sqrt(1 + 4*v))/2;
+		return Distributions.nextErlang(v, m, this.random)*mode;
+	}
+	
+	/*
+	 * helper utility to draw a random value from a nicely shaped Beta distribution between 0 and 1 (based around mode and "concentration")
+	 */
+	public double drawBeta(double mode, double var) {
+		double a = mode*(500*var)+1;
+		double b = (1-mode)*(500*var)+1;
+		Beta beta = new Beta(a, b, this.random);
+		return beta.nextDouble();
 	}
 
 }
