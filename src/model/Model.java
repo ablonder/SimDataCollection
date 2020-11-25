@@ -324,12 +324,11 @@ public abstract class Model extends SimState  {
 				// choice between a provided number of options (mostly used for a coin flip on binary variables) 
 				return rand.nextInt(Integer.parseInt(distparams[0]));
 			case 'E':
-				// Erlang distribution, for things that are generally small (but above 0), with some larger values (based on variance and mean)
-				double draw = Distributions.nextErlang(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), rand);
-				// if there's a third parameter, that's a scale multiplier (struggles with large values - algorithm runs mean^2/var iterations)
-				// (scale by dividing mean and sd by a constant, convert sd to variance by squaring, and then scale back up the result)
-				if(distparams.length > 2) draw *= Double.parseDouble(distparams[2]);
-				return draw;
+				// Erlang distribution, for things that are generally small (but above 0), with some larger values (with mode and sd)
+				return drawErlang(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]));
+			case 'B':
+				// Beta distribution for things between 0 and 1 (with mode and inverse sd)
+				return drawBeta(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]));
 			}
 		}catch(NumberFormatException e) {
 			// this and a few other things will result in returning NaN
@@ -751,11 +750,15 @@ public abstract class Model extends SimState  {
 	
 	/*
 	 * helper utility to draw a random value from a nicely shaped Erlang distribution (based around mode and standard deviation)
+	 * 	(note: struggles with large values - algorithm runs mean^2/var iterations
+	 *   scale by dividing mean and sd by a constant, convert sd to variance by squaring, and then scale back up the result)
 	 */
 	public double drawErlang(double mode, double sd) {
 		double v = Math.pow(2*sd, 2);
 		double m = (1+Math.sqrt(1 + 4*v))/2;
-		return Distributions.nextErlang(v, m, this.random)*mode;
+		double draw = Distributions.nextErlang(v, m, this.random);
+		if(draw == Double.POSITIVE_INFINITY) return mode;
+		return draw*mode;
 	}
 	
 	/*
@@ -765,7 +768,8 @@ public abstract class Model extends SimState  {
 		double a = mode*(500*var)+1;
 		double b = (1-mode)*(500*var)+1;
 		Beta beta = new Beta(a, b, this.random);
-		return beta.nextDouble();
+		double draw = beta.nextDouble();
+		return draw;
 	}
 
 }
