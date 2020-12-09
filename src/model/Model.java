@@ -30,6 +30,8 @@ public abstract class Model extends SimState  {
 	public ArrayList<ArrayList<String>> testvals = new ArrayList<ArrayList<String>>();
 	// initialize empty array of parameters to randomize
 	public ArrayList<Integer> randparams = new ArrayList<Integer>();
+	// initialize empty array of distributions to draw randomly from
+	public ArrayList<String> randdists = new ArrayList<String>();
 	// file writer for the end of run results
 	public BufferedWriter endwriter;
 	// file writer for timecourse results taken at the indicated interval
@@ -239,24 +241,24 @@ public abstract class Model extends SimState  {
 			paramgen.setSeed(this.seed);
 			for(int i = 0; i < this.iters; i++) {
 				// create a new list that's a copy of params to put the rand params into
-				ArrayList<String> iterparams = new ArrayList<String>(Arrays.asList(this.params));
+				//ArrayList<String> iterparams = new ArrayList<String>(Arrays.asList(this.params));
 				// randomly draw all the randparams
 				for(int r = 0; r < this.randparams.size(); r++) {
-					double val = parseRand(paramgen, this.params[this.randparams.get(r)]);
+					double val = parseRand(paramgen, this.randdists.get(r));
 					// if that's NaN, something didn't work, and print out a message, but keep going
 					if(Double.isNaN(val)) {
 						System.out.println("Random parameter not formatted correctly.");
 					}
-					iterparams.set(this.randparams.get(r), String.valueOf(val));
+					this.params[this.randparams.get(r)] = String.valueOf(val);
 				}
 				// then, if there are no test params, just test
 				if(this.testparams.size() == 0) {
 					// test the model for the given seed, number of steps, replications,
 					// and the test interval
-					test(iterparams);
+					test();
 				} else {
 					// otherwise sweep
-					sweep(iterparams, 0);
+					sweep(0);
 				}
 			}
 			try {
@@ -278,11 +280,14 @@ public abstract class Model extends SimState  {
 	 */
 	public void parse(int param, String val) {
 		// first check to see if it's to be randomly drawn (if the parser doesn't return Not a Number)
-		if(!Double.isNaN(parseRand(this.random, val))) {
+		double draw = parseRand(this.random, val);
+		if(!Double.isNaN(draw)) {
 			// then add it to randparams
 			this.randparams.add(param);
-			// and just leave its value the same
-			this.params[param] = val;
+			// store the indicated distribution
+			this.randdists.add(val);
+			// and draw a value for it
+			this.params[param] = Double.toString(draw);
 		} else {
 			// otherwise, check to see if its a test value (for now these are mutually exclusive)
 			// split the value between spaces
@@ -323,12 +328,10 @@ public abstract class Model extends SimState  {
 			case 'C':
 				// choice between a provided number of options (mostly used for a coin flip on binary variables) 
 				return rand.nextInt(Integer.parseInt(distparams[0]));
-			case 'E':
-				// Erlang distribution, for things that are generally small (but above 0), with some larger values (with mode and sd)
-				return drawErlang(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]));
-			case 'B':
-				// Beta distribution for things between 0 and 1 (with mode and inverse sd)
-				return drawBeta(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]));
+			case 'G':
+				// Gamma distribution, for things that are generally small (but above 0), with some larger values - with optional min
+				if(distparams.length < 3) return(drawGamma(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), 0, rand));
+				return drawGamma(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), Double.parseDouble(distparams[2]), rand);
 			}
 		}catch(NumberFormatException e) {
 			// this and a few other things will result in returning NaN
@@ -425,18 +428,18 @@ public abstract class Model extends SimState  {
 	/*
 	 * In charge of running the sweeps recursively
 	 */
-	public void sweep(ArrayList<String> params, int tdex) {
+	public void sweep(int tdex) {
 		// test each value of this parameter
 		for(int v = 0; v < this.testvals.get(tdex).size(); v++) {
 			// create a copy of params with this parameter value
-			ArrayList<String> paramcopy = new ArrayList<String>(params);
-			paramcopy.set(this.testparams.get(tdex), this.testvals.get(tdex).get(v));
+			//ArrayList<String> paramcopy = new ArrayList<String>(params);
+			this.params[this.testparams.get(tdex)] = this.testvals.get(tdex).get(v);
 			// if this isn't the last parameter, test the values of the remaining parameters
 			if(tdex < this.testparams.size()-1) {
-				sweep(paramcopy, tdex+1);
+				sweep(tdex+1);
 			} else {
 				// otherwise, run this simulation
-				test(paramcopy);
+				test();
 			}
 		}
 	}
@@ -444,21 +447,21 @@ public abstract class Model extends SimState  {
 	/*
 	 * Actually runs the simulation on the provided parameters
 	 */
-	public void test(ArrayList<String> params) {
-		System.out.println(params.toString());
+	public void test() {
+		System.out.println(Arrays.asList(this.params).toString());
 		// store the parameters for this run as a string for writing to file
 		String p = "";
 		// followed by all the random and test parameter values
 		for(int r = 0; r < this.randparams.size(); r++) {
-			p += params.get(this.randparams.get(r)) + this.sep;
+			p += this.params[this.randparams.get(r)] + this.sep;
 		}
 		for(int t = 0; t < this.testparams.size(); t++) {
-			p += params.get(this.testparams.get(t)) + this.sep;
+			p += this.params[this.testparams.get(t)] + this.sep;
 		}
 		// run the same simulation for the designated number of replications
 		for(int i = 0; i < reps; i++) {
 			// set model parameters from args (needs to be done fresh each time or they can build)
-			setParams(params.toArray(new String[params.size()]));
+			setParams(this.params.clone());
 			// store the seed for this run
 			int s = seed+i;
 			// reseed with the seed parameter, plus the replication number
@@ -480,6 +483,16 @@ public abstract class Model extends SimState  {
 		}
 	}
 
+	
+	/*
+	 * Allows the subclass to alter the value of a param (without having to mess with params directly...)
+	 */
+	public void resetParam(String param, String val) {
+		// get index of param from paramnames, and then reassign that value in params
+		this.params[Arrays.asList(paramnames).indexOf(param)] = val;
+		// TODO - catch if it's not a real param
+	}
+	
 	/*
 	 * creates the lists of parameter names (paramnames) and result categories (resnames),
 	 * can also change whether to automatically get params and results
@@ -492,7 +505,7 @@ public abstract class Model extends SimState  {
 		// and an empty list of agent results
 		this.agentres = new String[0];
 	}
-
+	
 	/*
 	 * The subclass has to set subclass to store its own type and agent to store the agent type
 	 */
@@ -752,24 +765,66 @@ public abstract class Model extends SimState  {
 	 * helper utility to draw a random value from a nicely shaped Erlang distribution (based around mode and standard deviation)
 	 * 	(note: struggles with large values - algorithm runs mean^2/var iterations
 	 *   scale by dividing mean and sd by a constant, convert sd to variance by squaring, and then scale back up the result)
+	 *   TODO - phase out for GammaNormalized
 	 */
 	public double drawErlang(double mode, double sd) {
+		// if the standard deviation is too low, just use a normal, that should be fine (otherwise it'll take a while and return infs)
+		if(sd < .02) return drawRange(mode, sd, 0, Double.MAX_VALUE);
 		double v = Math.pow(2*sd, 2);
 		double m = (1+Math.sqrt(1 + 4*v))/2;
+		// switch to draw from Gamma
 		double draw = Distributions.nextErlang(v, m, this.random);
 		if(draw == Double.POSITIVE_INFINITY) return mode;
 		return draw*mode;
 	}
 	
 	/*
-	 * helper utility to draw a random value from a nicely shaped Beta distribution between 0 and 1 (based around mode and "concentration")
+	 * calls drawErlang with a min other than 0 by subtracting and then adding back
 	 */
-	public double drawBeta(double mode, double var) {
+	public double drawErlang(double mode, double sd, double min) {
+		return drawErlang(mode-min, sd) + min;
+	}
+	
+	/*
+	 * Wrapper for GammaNormalized that adjusts the mean and min
+	 */
+	public double drawGamma(double mean, double sd, double min, MersenneTwisterFast random) {
+		GammaNormalized gamma = GammaNormalized.initialize(sd, random);
+		return gamma.nextDouble()*(mean-min) + min;
+	}
+	
+	/*
+	 * option to run Gamma with the default random generator
+	 */
+	public double drawGamma(double mean, double sd, double min) {
+		return drawGamma(mean, sd, min, this.random);
+	}
+	
+	/*
+	 * helper utility to draw a random value from a nicely shaped Beta distribution between 0 and 1 (based around mode and "concentration")
+	 * TODO - phase out
+	 */
+	public double drawBetaMode(double mode, double var) {
 		double a = mode*(500*var)+1;
 		double b = (1-mode)*(500*var)+1;
 		Beta beta = new Beta(a, b, this.random);
 		double draw = beta.nextDouble();
 		return draw;
 	}
+	
+	/*
+	 * Draws from a beta distribution based on mean and inverse square root sample size (to allow for a parameter between 0 and 1)
+	 */
+	public double drawBeta(double mean, double var) {
+		// since this involves dividing by variation, make sure it's greater than 0
+		if(var < .0001) return mean;
+		// also make sure the mean is between .0001 and .9999 just to be safe
+		mean = Math.min(Math.max(mean, .0001), .9999);
+		double a = mean/Math.pow(var, 2);
+		double b = (1-mean)/Math.pow(var, 2);
+		Beta beta = new Beta(a, b, this.random);
+		return beta.nextDouble();
+	}
+	
 
 }
