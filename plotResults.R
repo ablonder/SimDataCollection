@@ -26,7 +26,7 @@ library(gridExtra)
 # errorbars - whether linegraphs or barplots should include error bars
 plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, 
                        linelabels = c(), shapelabels = c(), savelv = 2, pointsize = F, errorbars = F,
-                       colorlegend = T, linelegend = T, shapelegend = T){
+                       colorlegend = T, linelegend = T, shapelegend = T, aggregate = T){
   if(length(params) == savelv){
     # loop through each set of measures to crete the corresponding plots
     for(v in 1:length(testvars)) {
@@ -90,11 +90,13 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       # turn the color into a factor
       plotd$c = factor(plotd$c)
       # if this isn't a scatter plot average the relevant measures so there aren't duplicates
-      if(!scatter){
+      if(aggregate){
         plotd = summarize(group_by(group_by_at(plotd, params[1:(length(params)-2)]), x, c, s, l, add = T),
                           N = length(measure), mean = mean(measure, na.rm = T),
                           sd = sd(measure, na.rm = T), se = sd / sqrt(N))
         plotd = as.data.frame(plotd)
+      } else {
+        plotd = mutate(plotd, N = 1, mean = measure, sd = 0, se = 0)
       }
       # toggle legends
       if(colorlegend){
@@ -112,25 +114,25 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       } else {
         sleg = F
       }
+      # also toggle error bars by getting rid of standard error
+      if(!errorbars){
+        plotd$se = 0
+      }
       # plot the results
       if(is.numeric(plotd$x)){
         # create a scatter plot if scatter is true
         if(scatter){
           plot = ggplot(plotd, aes(x = x, y = measure, colour = c)) + geom_point(aes(shape = s)) +
             ylab(testlabels[v]) + xlab(params[length(params)-1]) + labs(colour = params[length(params)]) +
-            guides(colour=cleg, shape=sleg) +
+            guides(colour=cleg, shape=sleg) + geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +
             geom_smooth(method = 'lm', se = F)
         } else {
         # otherwise turn this into a linegraph
           # if the points are scaled by number of points, do that here
           ## TODO - get the points to actually be smaller when pointsize is off
-          ps = 0
+          ps = F
           if(pointsize){
             plotd$ps = plotd$N/sum(plotd$N)
-          }
-          # also toggle error bars by getting rid of standard error
-          if(!errorbars){
-            plotd$se = 0
           }
           plot = ggplot(plotd, aes(x = x, y = mean, colour = c)) +
             geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) + geom_line(aes(linetype = l)) +
