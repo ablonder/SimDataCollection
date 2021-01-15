@@ -41,7 +41,7 @@ public abstract class Model extends SimState  {
 	// the separator for writing results to file
 	public char sep = ',';
 	// key parameters used in every model (as class variables for access if the user wants them)
-	public static String[] keyparams = {"seed", "sep", "steps", "iters", "reps", "fname", "testint", "gui"};
+	public static String[] keyparams = {"seed", "sep", "steps", "iters", "reps", "fname", "testint", "gui", "agentint"};
 	public int seed = 0;
 	public int steps;
 	public int iters = 1;
@@ -49,6 +49,7 @@ public abstract class Model extends SimState  {
 	public String fname = "";
 	public int testint;
 	public boolean gui = false;
+	public int agentint = 0;
 	// list of parameter names - to be made in the child class
 	public String[] paramnames;
 	// indicates whether to automatically use the subclass fields as parameters - default to true
@@ -240,8 +241,6 @@ public abstract class Model extends SimState  {
 			MersenneTwisterFast paramgen = new MersenneTwisterFast();
 			paramgen.setSeed(this.seed);
 			for(int i = 0; i < this.iters; i++) {
-				// create a new list that's a copy of params to put the rand params into
-				//ArrayList<String> iterparams = new ArrayList<String>(Arrays.asList(this.params));
 				// randomly draw all the randparams
 				for(int r = 0; r < this.randparams.size(); r++) {
 					double val = parseRand(paramgen, this.randdists.get(r));
@@ -589,18 +588,21 @@ public abstract class Model extends SimState  {
 					this.endwriter.write("" + s + this.sep + params + res + "\n");
 				}
 			}
-			// and get individual agent results (if any have been designated)
-			if(this.agentres.length > 0) {
+			// and get individual agent results (if any have been designated, and this is the right interval)
+			if(this.agentres.length > 0 && (this.agentint == 0 || this.schedule.getSteps()%this.agentint == 0)) {
 				// loop through each agent in the list
 				for(int o = 0; o < this.agents.length; o++) {
-					// initialize a string for the results for this agent
-					String res = "";
-					//  loop through each result and get the corresponding value
-					for(String r : this.agentres) {
-						res += getResult(r, this.agents[o], this.agentclass) + this.sep;
+					// make sure the agent isn't null (there's no reason to print out all these empty lines)
+					if(this.agents[o] != null) {
+						// initialize a string for the results for this agent
+						String res = "";
+						//  loop through each result and get the corresponding value
+						for(String r : this.agentres) {
+							res += getResult(r, this.agents[o], this.agentclass) + this.sep;
+						}
+						// write params, the agent's number, and the results to the agent results
+						this.agentwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + o + this.sep + res + "\n");
 					}
-					// write params, the agent's number, and the results to the agent results
-					this.agentwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + o + this.sep + res + "\n");
 				}
 			}
 		} catch(IOException e) {
