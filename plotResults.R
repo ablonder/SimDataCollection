@@ -64,7 +64,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       if(length(cats) >= j & length(linelabels) > 0){
         plotd$l = factor(plotd[, cats[j]])
         j = j+1
-        # also set the line label
+        # also create the line legend
         if(length(linelabels) == 1){
           llab = linelabels[1]
         } else {
@@ -98,7 +98,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       } else {
         plotd = mutate(plotd, N = 1, mean = measure, sd = 0, se = 0)
       }
-      # toggle legends
+      # toggle legends - TODO - integrate this so it only creates legends if the category actually exists
       if(colorlegend){
         cleg = guide_legend(title=clab)
       } else {
@@ -122,21 +122,23 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       if(is.numeric(plotd$x)){
         # create a scatter plot if scatter is true
         if(scatter){
-          plot = ggplot(plotd, aes(x = x, y = measure, colour = c)) + geom_point(aes(shape = s)) +
+          plot = ggplot(plotd, aes(x = x, y = measure, colour = c, shape = s)) + geom_point() +
             ylab(testlabels[v]) + xlab(params[length(params)-1]) + labs(colour = params[length(params)]) +
             guides(colour=cleg, shape=sleg) + geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +
             geom_smooth(method = 'lm', se = F)
+          ## TODO - give it the option to turn off the geom_smooth()
         } else {
         # otherwise turn this into a linegraph
           # if the points are scaled by number of points, do that here
-          ## TODO - get the points to actually be smaller when pointsize is off
           ps = F
           if(pointsize){
             plotd$ps = plotd$N/sum(plotd$N)
           }
           plot = ggplot(plotd, aes(x = x, y = mean, colour = c)) +
-            geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) + geom_line(aes(linetype = l)) +
-            geom_point(aes(shape = s, size = ps)) + ylab(testlabels[v]) + xlab(params[length(params)-1]) +
+            geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +
+            geom_line(aes(linetype = l), position = position_dodge(.5)) +
+            geom_point(aes(shape = s, size = ps), position = position_dodge(.5)) +
+            ylab(testlabels[v]) + xlab(params[length(params)-1]) +
             labs(colour = params[length(params)]) +
             guides(colour=cleg, shape=sleg, linetype=lleg, size = "none")
         }
@@ -173,7 +175,8 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       # get the corresponding plot/grid of plots
       plotResults(dtable[dtable[, params[1]] == v, ], params[-1], f, testvars, testlabels, catlabels,
                   scatter, linelabels = linelabels, shapelabels = shapelabels, savelv = savelv,
-                  colorlegend = colorlegend, linelegend = linelegend, shapelegend = shapelegend)
+                  colorlegend = colorlegend, linelegend = linelegend, shapelegend = shapelegend,
+                  errorbars = errorbars, pointsize = pointsize, aggregate = aggregate)
     }
   }
 }
