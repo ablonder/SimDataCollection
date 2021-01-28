@@ -118,7 +118,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       if(is.numeric(plotd$x)){
         # create a scatter plot if scatter is true
         if(scatter){
-          plot = ggplot(plotd, aes(x = x, y = measure, colour = c, shape = s)) + geom_point() +
+          plot = ggplot(plotd, aes(x = x, y = mean, colour = c, shape = s)) + geom_point() +
             ylab(testlabels[v]) + xlab(params[length(params)-1]) + labs(colour = params[length(params)]) +
             guides(colour=cleg, shape=sleg) + geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1)
           # adds a fitline if that option is turned on
