@@ -151,15 +151,15 @@
               plot = plot + geom_smooth(method = 'lm', se = F)
             }
           } else {
-          # otherwise turn this into a linegraph
-            plot = plot + geom_line(aes(linetype = l), position = position_dodge(.5)) +
-              geom_point(aes(size = ps), position = position_dodge(.5)) + 
-              geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +
+            # otherwise turn this into a linegraph
+            plot = plot + geom_line(aes(linetype = l), position = position_dodge(.01)) +
+              geom_point(aes(size = ps), position = position_dodge(.01)) + 
+              geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.01, position = position_dodge(.01)) +
               guides(colour=cleg, shape=sleg, linetype=lleg, size = "none")
           }
         } else {
           if(!aggregate){
-            # if this is a factor unaggregated plot, make a box plot
+            # if this is a factor unaggregated plot, make a box plot (with points over it)
             plot = plot + geom_boxplot() + geom_jitter(aes(alpha = 1/length(plotd)), width = .01) + 
               guides(colour=cleg, shape=sleg, alpha = "none")
           } else {
