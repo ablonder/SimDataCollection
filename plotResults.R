@@ -13,7 +13,7 @@
   #     if linelabels have been provided, the next column name is used to determine the line pattern
   #     any remaining column names are concatenated and used to color the lines/points/bars
   # fname - the beginning of the name of all the outputted files
-  #   each graph's name will consist of fname, followed by the names and values of the parameters used to split the data
+  #   each file name will be fname followed by the names and values of the parameters used to split the data
   # testvars - list of vectors of column names to plot together (as y-values) on the same graph
   #   can be used to color the graph or for the x-axis if included in params as "category"
   # testlabels - vector of labels for the y-axis of each graph, should be one or the same length as testvars
@@ -21,6 +21,7 @@
   # scatter - whether a scatter plot is returned, or the data is turned into a barplot/linegraph
   # linelabels - vector of labels for the line patterns of each graph, should be one or the same length as testvars
   # shapelables - vector of labels for the point shapes of each graph, should be one or the same length as testvars
+  # xlabels - vector of labels for the x-axis of each graph, should be one or the same length as testvars
   # savelv - how many parameter combinations should be included in the same facetted plot, maximum 4
   # pointsize - whether points should be scaled according to the number of values averaged to create them
   # errorbars - whether plots should include error bars
@@ -28,10 +29,10 @@
   # aggregate - whether entries with the same provided params are averaged over or all displayed
   # fitline - whether a scatterplot has a line of fit
   # width, height - dimensions for the graph created, default to the size of the current plotting window
-  plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, 
-                         linelabels = c(), shapelabels = c(), savelv = 2, pointsize = F, errorbars = F,
-                         colorlegend = T, linelegend = T, shapelegend = T, aggregate = T, fitline = F,
-                         width = par("din")[1], height = par("din")[2]){
+  plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, linetypes = F,
+                         shapes = F, linelabels = c(), shapelabels = c(), xlabels = c(), savelv = 2,
+                         pointsize = F, errorbars = F, colorlegend = T, linelegend = T, shapelegend = T,
+                         aggregate = T, fitline = F, width = par("din")[1], height = par("din")[2], colpal = NULL){
     if(length(params) == savelv){
       # loop through each set of measures to crete the corresponding plots
       for(v in 1:length(testvars)) {
@@ -41,6 +42,14 @@
         is.na(plotd) = sapply(plotd, is.infinite)
         # grab the x axis variable for convenience
         plotd$x = plotd[, params[length(params)-1]]
+        # and see if a label has been provided
+        if(length(xlabels) == 0){
+          xlab = params[length(params)-1]
+        } else if(length(xlabels) == 1){
+          xlab = xlabels[1]
+        } else {
+          xlab = xlabels[v]
+        }
         # split the category to see if there are actually multiple
         cats = strsplit(params[length(params)], " ")[[1]]
         # the category can be split by color
@@ -53,13 +62,16 @@
         j = 1
         # if the data is going to be split into shapes, use the first category for that
         sleg = F
-        if(length(shapelabels) > 0){
+        if(shapes | length(shapelabels) > 0){
           plotd$s = factor(plotd[, cats[1]])
           j = j+1
           # also if we're actually doing a shape legend, create that
           if(shapelegend){
-          # if there's only one shape label given use that
-            if(length(shapelabels) == 1){
+            # if there aren't any shape labels given, just use the parameter name
+            if(length(shapelabels == 0)){
+              slab = cats[1]
+            } else if(length(shapelabels) == 1){
+              # otherwise, if there's only one shape label given use that
               slab = shapelabels[1]
             } else {
               # otherwise, use the label corresponding to this test variable
@@ -68,14 +80,16 @@
             sleg = guide_legend(title = slab)
           }
         }
-        # if there are more categories left and this is going to be split into linetypes, do so
+        # if there are more categories left and this is going to be split into linetypes, do that
         lleg = F
-        if(length(cats) >= j & length(linelabels) > 0){
+        if(length(cats) >= j & (linetypes | length(linelabels) > 0)){
           plotd$l = factor(plotd[, cats[j]])
           j = j+1
-          # also create the line legend if there's going to be one
+          # also create the line legend if there's going to be one (same as above)
           if(linelegend){
-            if(length(linelabels) == 1){
+            if(length(linelabels) == 0){
+              llab = cats[j-1]
+            } else if(length(linelabels) == 1){
               llab = linelabels[1]
             } else {
               llab = linelables[v]
@@ -91,7 +105,9 @@
           }
           # also set the color label if there's going to be a legend
           if(colorlegend){
-            if(length(catlabels) == 1){
+            if(length(catlabels) == 0){
+              clab = paste(cats[j:length(cats)])
+            } else if(length(catlabels) == 1){
               clab = catlabels[1]
             } else {
               clab = catlables[v]
@@ -101,59 +117,61 @@
         }
         # turn the color into a factor
         plotd$c = factor(plotd$c)
-        # if the data isn't being aggregated, average the relevant measures so there aren't duplicates
+        # if the data is being aggregated, average the relevant measures so there aren't duplicates
         if(aggregate){
           plotd = summarize(group_by(group_by_at(plotd, params[1:(length(params)-2)]), x, c, s, l, add = T),
                             N = length(measure), mean = mean(measure, na.rm = T),
                             sd = sd(measure, na.rm = T), se = sd / sqrt(N))
           plotd = as.data.frame(plotd)
         } else {
+          # otherwise, just rename some things so it has the same columns
           plotd = mutate(plotd, N = 1, mean = measure, sd = 0, se = 0)
         }
-        # also toggle error bars by getting rid of standard error
+        # toggle error bars by getting rid of standard error
         if(!errorbars){
           plotd$se = 0
         }
-        # plot the results
+        # if the points are scaled by number of points, do that here
+        # TODO - get this to work for both scatterplots and linegraphs (for now it's just for line graphs)
+        ps = F
+        if(pointsize){
+          plotd$ps = plotd$N/sum(plotd$N)
+        }
+        # plot the results - this is the basic plot, and then I'll be adding things to it
+        plot = ggplot(plotd, aes(x = x, y = mean, color = c, shape = s)) + ylab(testlabels[v]) + xlab(xlab)
         # TODO - give it the option to tell it what type of color to use
+        # TODO - maybe make it a more explicit switch between bar and point
         if(is.numeric(plotd$x)){
           # create a scatter plot if scatter is true
           if(scatter){
-            plot = ggplot(plotd, aes(x = x, y = mean, color = c, shape = s)) + geom_point() +
-              ylab(testlabels[v]) + xlab(params[length(params)-1]) + labs(colour = params[length(params)]) +
-              guides(colour=cleg, shape=sleg) + geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) #+ scale_color_viridis_d()
+            plot = plot + geom_point() + guides(colour=cleg, shape=sleg, size = "none") +
+              geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1)
             # adds a fitline if that option is turned on
             if(fitline){
               plot = plot + geom_smooth(method = 'lm', se = F)
             }
           } else {
           # otherwise turn this into a linegraph
-            # if the points are scaled by number of points, do that here
-            ps = F
-            if(pointsize){
-              plotd$ps = plotd$N/sum(plotd$N)
-            }
-            plot = ggplot(plotd, aes(x = x, y = mean, colour = c)) +
+            plot = plot + geom_line(aes(linetype = l), position = position_dodge(.5)) +
+              geom_point(aes(size = ps), position = position_dodge(.5)) + 
               geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +
-              geom_line(aes(linetype = l), position = position_dodge(.5)) +
-              geom_point(aes(shape = s, size = ps), position = position_dodge(.5)) +
-              ylab(testlabels[v]) + xlab(params[length(params)-1]) +
-              labs(colour = params[length(params)]) +
               guides(colour=cleg, shape=sleg, linetype=lleg, size = "none")
           }
         } else {
           if(!aggregate){
             # if this is a factor unaggregated plot, make a box plot
-            plot = ggplot(plotd, aes(x = x, y = measure)) + geom_boxplot() + 
-              geom_jitter(aes(colour = c, shape = s, alpha = 1/length(plotd)), width = .01) + ylab(testlabels[v]) + xlab(params[length(params)-1]) +
-              labs(colour = params[length(params)]) + guides(colour=cleg, shape=sleg, alpha = "none")
+            plot = plot + geom_boxplot() + geom_jitter(aes(alpha = 1/length(plotd)), width = .01) + 
+              guides(colour=cleg, shape=sleg, alpha = "none")
           } else {
           # otherwise, turn it into a bargraph
-            plot = ggplot(plotd, aes(x = x, y = mean, fill = c, color = c)) +
+            plot = plot + geom_bar(aes(fill = c), stat = "identity", position = "dodge") +
               geom_errorbar(aes(ymin=mean-se, ymax=mean+se), position=position_dodge(.9)) +
-              geom_bar(stat = "identity", position = "dodge") + ylab(testlabels[v]) + xlab(params[length(params)-1]) + 
-              labs(fill = params[length(params)]) + guides(fill=cleg, color = "none") + geom_point()
+              guides(fill=cleg, color = "none")
           }
+        }
+        # if a color palette has been provided, use that
+        if(!is.null(colpal)){
+          plot = plot + colpal
         }
         # if the save level is higher than 2, make a grid of grids for all the remaining parameters
         # if the save level is 3, just make a single row
