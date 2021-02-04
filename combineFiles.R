@@ -1,10 +1,10 @@
 library(stringr)
 
-combineFiles = function(fnames, paramIDs=c(), endstrings=c(), paramnames=c(), sep = ","){
+combineFiles = function(fnames, paramIDs=c(), endstrings=c(), paramnames=c(), sep = ",", filetypes = c("")){
   dtable = data.frame()
   for(f in 1:length(fnames)){
-    # just look at the ones that end in "txt" for now - TODO - give it a list of filetypes to accept
-    if(str_sub(fnames[f], start = -4) == ".txt"){
+    # just combine the ones that have the provided strings (or, if no strings have been provided, combine all)
+    if(any(str_detect(fnames[f], filetypes))){
       d = read.table(fnames[f], header = TRUE, comment.char = "%", sep = sep)
       # find all the params and endstrings
       if(length(c(paramIDs, endstrings)) > 0){

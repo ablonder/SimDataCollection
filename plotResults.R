@@ -19,16 +19,19 @@
   # testlabels - vector of labels for the y-axis of each graph, should be one or the same length as testvars
   # catlabels - vector of labels for the colors of each graph, should be one or the same length as testvars
   # scatter - whether a scatter plot is returned, or the data is turned into a barplot/linegraph
+  # linetypes - whether one of the last column names provided in params should be used to determine the line pattern
+  # shapes - whether one of the last column names provided in params should be used to determine the point shape
   # linelabels - vector of labels for the line patterns of each graph, should be one or the same length as testvars
   # shapelables - vector of labels for the point shapes of each graph, should be one or the same length as testvars
   # xlabels - vector of labels for the x-axis of each graph, should be one or the same length as testvars
-  # savelv - how many parameter combinations should be included in the same facetted plot, maximum 4
+  # savelv - how many parameter combinations should be included in the same facetted plot, minimum 2, maximum 4
   # pointsize - whether points should be scaled according to the number of values averaged to create them
-  # errorbars - whether plots should include error bars
+  # errorbars - whether plots should include error bars (only works if not aggreagated)
   # colorlegend, linelegend, shapelegend - whether to actually display the legends for each attribute
   # aggregate - whether entries with the same provided params are averaged over or all displayed
   # fitline - whether a scatterplot has a line of fit
   # width, height - dimensions for the graph created, default to the size of the current plotting window
+  # colpal - an alternative ggplot color palatte to be added on to the graph
   plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, linetypes = F,
                          shapes = F, linelabels = c(), shapelabels = c(), xlabels = c(), savelv = 2,
                          pointsize = F, errorbars = F, colorlegend = T, linelegend = T, shapelegend = T,
