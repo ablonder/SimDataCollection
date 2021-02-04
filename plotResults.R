@@ -139,7 +139,6 @@
         }
         # plot the results - this is the basic plot, and then I'll be adding things to it
         plot = ggplot(plotd, aes(x = x, y = mean, color = c, shape = s)) + ylab(testlabels[v]) + xlab(xlab)
-        # TODO - give it the option to tell it what type of color to use
         # TODO - maybe make it a more explicit switch between bar and point
         if(is.numeric(plotd$x)){
           # create a scatter plot if scatter is true
