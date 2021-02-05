@@ -272,6 +272,7 @@ public abstract class Model extends SimState  {
 				System.out.println("Writer not closing...");
 			}
 		}
+		System.out.println("done.");
 	}
 
 	/*
