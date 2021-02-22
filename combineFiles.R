@@ -41,8 +41,8 @@ combineFiles = function(fnames, paramIDs=c(), endstrings=c(), paramnames=c(), se
         # check each row to add the value to the table
         for(r in 1:nrow(header)){
           if(!is.element(toString(header[r,1]), names(d))){
-            if(is.numeric(header[r,2])){
-              d[,toString(header[r,1])] = as.numeric(header[r,2])
+            if(!is.na(as.numeric(toString(header[r,2])))){
+              d[,toString(header[r,1])] = as.numeric(toString(header[r,2]))
             } else{
               d[,toString(header[r,1])] = toString(header[r,2])
             }
