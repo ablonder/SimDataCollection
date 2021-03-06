@@ -32,10 +32,13 @@ library(gridExtra)
 # fitline - whether a scatterplot has a line of fit
 # width, height - dimensions for the graph created, default to the size of the current plotting window
 # colpal - an alternative ggplot color palatte to be added on to the graph
+## TODO - add the option to have additional groups if aggregate is false (mostly just for line graphs)
+## TODO - make "catlabels" (really color labels) optional
 plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, bargraph = F,
                        linetypes = F, shapes = F, linelabels = c(), shapelabels = c(), xlabels = c(), savelv = 2,
                        pointsize = F, errorbars = F, colorlegend = T, linelegend = T, shapelegend = T,
-                       aggregate = T, fitline = F, width = par("din")[1], height = par("din")[2], colpal = NULL){
+                       aggregate = T, fitline = F, width = par("din")[1], height = par("din")[2], colpal = NULL,
+                       theme = NULL){
   if(length(params) == savelv){
     # loop through each set of measures to crete the corresponding plots
     for(v in 1:length(testvars)) {
@@ -149,7 +152,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       # create a scatter plot if scatter is true
       if(scatter){
         plot = plot + geom_point() + guides(colour=cleg, shape=sleg, size = "none") +
-          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1)
+          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.01)
         # adds a fitline if that option is turned on
         if(fitline){
           plot = plot + geom_smooth(method = 'lm', se = F)
@@ -170,16 +173,19 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
         plot = plot + geom_line(aes(linetype = l), position = position_dodge(.01)) +
           geom_point(aes(size = ps), position = position_dodge(.01)) + 
           geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.01, position = position_dodge(.01)) +
-          guides(colour=cleg, shape=sleg, linetype=lleg, size = "none")
+          guides(colour=cleg, shape=sleg, linetype=lleg, size = "none", alpha = "none")
       }
       # if a color palette has been provided, use that
       if(!is.null(colpal)){
         plot = plot + colpal
       }
+      if(!is.null(theme)){
+        plot = plot + theme
+      }
       # if the save level is higher than 2, make a grid of grids for all the remaining parameters
       # if the save level is 3, just make a single row
       if(savelv == 3){
-        plot = plot + facet_grid(cols = vars(plotd[, params[(length(params)-2)]]))
+        plot = plot + facet_wrap(facets = vars(plotd[, params[(length(params)-2)]]), dir = "v", scale = "free_x")
       } else if (savelv > 3) {
         # otherwise, make a grid from the last two parameters
         plot = plot + facet_grid(rows = vars(plotd[, params[(length(params)-2)]]),
@@ -194,11 +200,11 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       # update the filename to pass it
       f = paste(fname, params[1], v, sep = "")
       # get the corresponding plot/grid of plots
-      plotResults(dtable[dtable[, params[1]] == v, ], params[-1], f, testvars, testlabels, catlabels,
-                  scatter, linelabels = linelabels, shapelabels = shapelabels, savelv = savelv,
-                  colorlegend = colorlegend, linelegend = linelegend, shapelegend = shapelegend,
-                  errorbars = errorbars, pointsize = pointsize, aggregate = aggregate, fitline = fitline,
-                  width = width, height = height)
+      plotResults(dtable[dtable[, params[1]] == v, ], params[-1], f, testvars, testlabels, catlabels, scatter,
+                  bargraph = bargraph, shapes = shapes, linetypes = linetypes, linelabels = linelabels,
+                  shapelabels = shapelabels, savelv = savelv, colorlegend = colorlegend, linelegend = linelegend,
+                  shapelegend = shapelegend, errorbars = errorbars, pointsize = pointsize, aggregate = aggregate,
+                  fitline = fitline, width = width, height = height, theme = theme, colpal = colpal)
     }
   }
 }

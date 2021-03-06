@@ -52,6 +52,7 @@ combineFiles = function(fnames, paramIDs=c(), endstrings=c(), paramnames=c(), se
       # now merge this dataframe with the previous, accounting for any columns they may not share
       for(n in names(dtable)){
         if(!is.element(n, names(d))){
+          # TODO - maybe the answer is to replace this with an empty string instead
           d[,n] = NA
         }
       }
