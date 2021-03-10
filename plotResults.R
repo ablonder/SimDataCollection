@@ -136,6 +136,9 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       # toggle error bars by getting rid of standard error
       if(!errorbars){
         plotd$se = 0
+        w = 0
+      } else {
+        w = .01
       }
       # if the points are scaled by number of points, do that here
       # TODO - get this to work for both scatterplots and linegraphs (for now it's just for line graphs)
@@ -151,8 +154,9 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       plot = ggplot(plotd, aes(x = x, y = mean, color = c, shape = s)) + ylab(testlabels[v]) + xlab(xlab)
       # create a scatter plot if scatter is true
       if(scatter){
-        plot = plot + geom_point() + guides(colour=cleg, shape=sleg, size = "none") +
-          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.01)
+        plot = plot + geom_point() +
+          guides(colour=cleg, shape=sleg, size = "none") +
+          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=w)
         # adds a fitline if that option is turned on
         if(fitline){
           plot = plot + geom_smooth(method = 'lm', se = F)
@@ -172,7 +176,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
         # otherwise turn this into a linegraph
         plot = plot + geom_line(aes(linetype = l), position = position_dodge(.01)) +
           geom_point(aes(size = ps), position = position_dodge(.01)) + 
-          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.01, position = position_dodge(.01)) +
+          geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=w, position = position_dodge(.01)) +
           guides(colour=cleg, shape=sleg, linetype=lleg, size = "none", alpha = "none")
       }
       # if a color palette has been provided, use that
