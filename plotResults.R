@@ -11,16 +11,19 @@ library(gridExtra)
 #   the last string in the vector may be multiple column names separated by spaces
 #     if shapelabels have been provided, the first column name is used to determine the shape of the points
 #     if linelabels have been provided, the next column name is used to determine the line pattern
-#     any remaining column names are concatenated and used to color the lines/points/bars
+#     any remaining column names are concatenated and used to color the graph
+#       (unless groups is true, in which case the next column is the color, and the rest are just groups)
 # fname - the beginning of the name of all the outputted files
 #   each file name will be fname followed by the names and values of the parameters used to split the data
 # testvars - list of vectors of column names to plot together (as y-values) on the same graph
 #   can be used to color the graph or for the x-axis if included in params as "category"
 # testlabels - vector of labels for the y-axis of each graph, should be one or the same length as testvars
-# catlabels - vector of labels for the colors of each graph, should be one or the same length as testvars
+# colorlabels - vector of labels for the colors of each graph, should be one or the same length as testvars
 # scatter - whether a scatter plot is returned, or the data is turned into a barplot/linegraph
+# colors - whether one of the last column names provided in params should be used to determine the graph color
 # linetypes - whether one of the last column names provided in params should be used to determine the line pattern
 # shapes - whether one of the last column names provided in params should be used to determine the point shape
+# groups - whether the remaining column names should be used as a grouping (as opposed to appended to color)
 # linelabels - vector of labels for the line patterns of each graph, should be one or the same length as testvars
 # shapelables - vector of labels for the point shapes of each graph, should be one or the same length as testvars
 # xlabels - vector of labels for the x-axis of each graph, should be one or the same length as testvars
@@ -32,13 +35,13 @@ library(gridExtra)
 # fitline - whether a scatterplot has a line of fit
 # width, height - dimensions for the graph created, default to the size of the current plotting window
 # colpal - an alternative ggplot color palatte to be added on to the graph
-## TODO - add the option to have additional groups if aggregate is false (mostly just for line graphs)
-## TODO - make "catlabels" (really color labels) optional
-plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, scatter = F, bargraph = F,
-                       linetypes = F, shapes = F, linelabels = c(), shapelabels = c(), xlabels = c(), savelv = 2,
-                       pointsize = F, errorbars = F, colorlegend = T, linelegend = T, shapelegend = T,
-                       aggregate = T, fitline = F, width = par("din")[1], height = par("din")[2], colpal = NULL,
-                       theme = NULL){
+## TODO - make testvars just a vector with spaces between parameters if they're supposed to be on the same graph
+##          and make testlabels optional (default to just the testvars)
+plotResults = function(dtable, params, fname, testvars, testlabels, colorlabels = c(), scatter = F, bargraph = F,
+                       colors = F, linetypes = F, shapes = F, groups = T, linelabels = c(), shapelabels = c(),
+                       xlabels = c(), savelv = 2, pointsize = F, errorbars = F, colorlegend = T, linelegend = T,
+                       shapelegend = T, aggregate = T, fitline = F, width = par("din")[1], height = par("din")[2],
+                       colpal = NULL, theme = NULL){
   if(length(params) == savelv){
     # loop through each set of measures to crete the corresponding plots
     for(v in 1:length(testvars)) {
@@ -62,8 +65,10 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       plotd$c = ""
       # by shape
       plotd$s = ""
-      # and by linetype
+      # by linetype
       plotd$l = ""
+      # and by additional groups
+      plotd$g = ""
       # I'm going to have an index here to increment
       j = 1
       # if the data is going to be split into shapes, use the first category for that
@@ -74,7 +79,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
         # also if we're actually doing a shape legend, create that
         if(shapelegend){
           # if there aren't any shape labels given, just use the parameter name
-          if(length(shapelabels == 0)){
+          if(length(shapelabels) == 0){
             slab = cats[1]
           } else if(length(shapelabels) == 1){
             # otherwise, if there's only one shape label given use that
@@ -105,27 +110,39 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
       }
       # if there are more categories left, use them to color the graph
       cleg = F
-      if(length(cats) >= j) {
-        for(i in j:length(cats)){
-          plotd$c = paste(plotd$c, plotd[, cats[i]])
+      if(length(cats) >= j & (colors | length(colorlabels) > 0)) {
+        # if there won't be additional groupings, use all the remaining categories to color the graph
+        if(!groups){
+          for(i in j:length(cats)){
+            plotd$c = paste(plotd$c, plotd[, cats[i]])
+          }
+          clab = paste(cats[j:length(cats)])
+        } else {
+          # otherwise, just use the next one, and increment j
+          plotd$c = plotd[, cats[j]]
+          clab = cats[j]
         }
         # also set the color label if there's going to be a legend
         if(colorlegend){
-          if(length(catlabels) == 0){
-            clab = paste(cats[j:length(cats)])
-          } else if(length(catlabels) == 1){
-            clab = catlabels[1]
-          } else {
-            clab = catlables[v]
+          if(length(colorlabels) == 1){
+            clab = colorlabels[1]
+          } else if(length(colorlabels) > 1) {
+            clab = colorlables[v]
           }
           cleg = guide_legend(title = clab)
         }
       }
-      # turn the color into a factor
-      plotd$c = factor(plotd$c)
+      # turn the color into a factor - TODO maybe make this optional
+      plotd$c = as.factor(plotd$c)
+      # lastly, if everything else is to be turned into groups, do that
+      if(groups){
+        for(i in 1:length(cats)){
+          plotd$g = paste(plotd$g, plotd[, cats[i]])
+        }
+      }
       # if the data is being aggregated, average the relevant measures so there aren't duplicates
       if(aggregate){
-        plotd = summarize(group_by(group_by_at(plotd, params[1:(length(params)-2)]), x, c, s, l, add = T),
+        plotd = summarize(group_by(group_by_at(plotd, params[1:(length(params)-2)]), x, c, s, l, g, add = T),
                           N = length(measure), mean = mean(measure, na.rm = T),
                           sd = sd(measure, na.rm = T), se = sd / sqrt(N))
         plotd = as.data.frame(plotd)
@@ -174,7 +191,7 @@ plotResults = function(dtable, params, fname, testvars, testlabels, catlabels, s
         }
       } else {
         # otherwise turn this into a linegraph
-        plot = plot + geom_line(aes(linetype = l), position = position_dodge(.01)) +
+        plot = plot + geom_line(aes(linetype = l, group = g), position = position_dodge(.01)) +
           geom_point(aes(size = ps), position = position_dodge(.01)) + 
           geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=w, position = position_dodge(.01)) +
           guides(colour=cleg, shape=sleg, linetype=lleg, size = "none", alpha = "none")
