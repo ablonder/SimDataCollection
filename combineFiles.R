@@ -6,7 +6,7 @@ combineFiles = function(fnames, paramIDs=c(), endstrings=c(), paramnames=c(), se
   for(f in 1:length(fnames)){
     # just combine the ones that have the provided strings (or, if no strings have been provided, combine all)
     if(any(str_detect(fnames[f], filetypes))){
-      d = read.table(fnames[f], header = TRUE, comment.char = "%", sep = sep)
+      d = read.table(fnames[f], header = TRUE, comment.char = "%", sep = sep, quote = "")
       # find all the params and endstrings
       if(length(c(paramIDs, endstrings)) > 0){
         splits = unlist(str_locate_all(fnames[f], c(paramIDs, endstrings)))
