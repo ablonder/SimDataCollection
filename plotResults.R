@@ -221,11 +221,12 @@ plotResults = function(dtable, params, fname, testvars, testlabels, colorlabels 
       # update the filename to pass it
       f = paste(fname, params[1], v, sep = "")
       # get the corresponding plot/grid of plots
-      plotResults(dtable[dtable[, params[1]] == v, ], params[-1], f, testvars, testlabels, catlabels, scatter,
-                  bargraph = bargraph, shapes = shapes, linetypes = linetypes, linelabels = linelabels,
-                  shapelabels = shapelabels, savelv = savelv, colorlegend = colorlegend, linelegend = linelegend,
-                  shapelegend = shapelegend, errorbars = errorbars, pointsize = pointsize, aggregate = aggregate,
-                  fitline = fitline, width = width, height = height, theme = theme, colpal = colpal)
+      plotResults(dtable[dtable[, params[1]] == v, ], params[-1], f, testvars, testlabels, colorlabels = colorlabels,
+                  scatter = scatter, bargraph = bargraph, color = colors, linetypes = linetypes, shapes = shapes, 
+                  groups = groups, linelabels = linelabels, shapelabels = shapelabels, xlabels = xlabels, savelv = savelv,
+                  pointsize = pointsize, errorbars = errorbars, colorlegend = colorlegend, linelegend = linelegend,
+                  shapelegend = shapelegend, aggregate = aggregate, fitline = fitline, width = width, height = height,
+                  theme = theme, colpal = colpal)
     }
   }
 }

@@ -41,13 +41,15 @@ public abstract class Model extends SimState  {
 	// the separator for writing results to file
 	public char sep = ',';
 	// key parameters used in every model (as class variables for access if the user wants them)
-	public static String[] keyparams = {"seed", "sep", "steps", "iters", "reps", "fname", "testint", "gui", "agentint"};
+	public static String[] keyparams = {"seed", "sep", "steps", "iters", "reps", "fname", "testint", "teststart",
+			"gui", "agentint"};
 	public int seed = 0;
 	public int steps;
 	public int iters = 1;
 	public int reps = 1;
 	public String fname = "";
 	public int testint;
+	public int teststart = 0;
 	public boolean gui = false;
 	public int agentint = 0;
 	// list of parameter names - to be made in the child class
@@ -472,7 +474,7 @@ public abstract class Model extends SimState  {
 			while(schedule.getSteps() < steps) {
 				// if this is the right step according to the test interval, write the results for this step
 				// TODO - give it the option to delay when it starts collecting data
-				if(schedule.getSteps()%testint == 0) {
+				if(schedule.getSteps() >= teststart && schedule.getSteps()%testint == 0) {
 					writeResults(s, p, false);
 				}
 				if (!schedule.step(this)) break;
