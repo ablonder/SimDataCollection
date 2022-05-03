@@ -1,6 +1,6 @@
 library(stringr)
 
-combineFiles = function(fnames, paramIDs=c(), endstrings=c(), paramnames=c(), sep = ",", filetypes = c(""),
+combineFiles = function(fnames = list.files(), paramIDs=c(), endstrings=c(), paramnames=c(), sep = ",", filetypes = c(""),
                         readheader = F){
   dtable = data.frame()
   for(f in 1:length(fnames)){
