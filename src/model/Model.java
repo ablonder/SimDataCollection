@@ -17,6 +17,8 @@ import java.util.Arrays;
 
 import ec.util.MersenneTwisterFast;
 import sim.engine.*;
+import sim.field.network.Edge;
+import sim.field.network.Network;
 import sim.util.distribution.Beta;
 import sim.util.distribution.Distributions;
 
@@ -38,11 +40,13 @@ public abstract class Model extends SimState  {
 	public BufferedWriter timewriter;
 	// file writer for individual agent results (only created if results are provided to be taken)
 	public BufferedWriter agentwriter;
+	// list of file writers for edgelists (only created if networks are provided to get edgelists from)
+	public BufferedWriter[] netwriters;
 	// the separator for writing results to file
 	public char sep = ',';
 	// key parameters used in every model (as class variables for access if the user wants them)
 	public static String[] keyparams = {"seed", "sep", "steps", "iters", "reps", "fname", "testint", "teststart",
-			"gui", "agentint"};
+			"gui", "agentint", "netint"};
 	public int seed = 0;
 	public int steps;
 	public int iters = 1;
@@ -52,6 +56,7 @@ public abstract class Model extends SimState  {
 	public int teststart = 0;
 	public boolean gui = false;
 	public int agentint = 0;
+	public int netint = 0;
 	// list of parameter names - to be made in the child class
 	public String[] paramnames;
 	// indicates whether to automatically use the subclass fields as parameters - default to true
@@ -62,9 +67,11 @@ public abstract class Model extends SimState  {
 	// defaults to true, but is only relevant when reading from file
 	public boolean autores = true;
 	// list of results to be gathered from each agent individually
-	public String[] agentres;
+	public String[] agentres = new String[0];
 	// list of agents
 	public Object[] agents;
+	// list of networks to be gathered from the model
+	public String[] nets = new String[0];
 	// list of results names added from file for splitting
 	public String[] fileres;
 	// the subclass for use in accessing its fields
@@ -156,7 +163,11 @@ public abstract class Model extends SimState  {
 					oldagentres.addAll(newagentres);
 					// store the resulting complete list as an array
 					this.agentres = oldagentres.toArray(new String[oldagentres.size()]);
-				} else if(splitline[1].length() > 1) {
+				} else if(this.autores && splitline[0].trim().equals("*edgeList") && splitline[1].length() > 1) {
+					// also catch the edgeList (which should also be a key parameter)
+					// split the following parameters to get a list of network names to create edgelists of
+					this.nets = splitline[1].trim().split(" ");
+				}else if(splitline[1].length() > 1) {
 					// otherwise, if there's something after the equals sign, add it to params
 					// check for key parameters marked by a star
 					if(line.charAt(0) == '*' && Arrays.asList(keyparams).contains(splitline[0].trim().substring(1))) {
@@ -235,6 +246,16 @@ public abstract class Model extends SimState  {
 					this.agentwriter = new BufferedWriter(new FileWriter(this.fname + "agentresults.txt"));
 					makeHeader(this.agentwriter, true, true, this.agentres);
 				}
+				// if there are network results, also create a file for each of those
+				if(this.nets.length > 0) {
+					// initialize a list of files equal to the number of networks
+					this.netwriters = new BufferedWriter[this.nets.length];
+					for(int i = 0; i < this.nets.length; i++) {
+						// then create each file
+						this.netwriters[i] = new BufferedWriter(new FileWriter(this.fname + this.nets[i] + "edgelist.txt"));
+						makeHeader(this.netwriters[i], true, false, new String[]{"from", "to", "info"});
+					}
+				}
 			} catch(IOException e) {
 				System.out.println("Something's wrong with your results files!");
 				System.exit(0);
@@ -269,6 +290,11 @@ public abstract class Model extends SimState  {
 				}
 				if(this.agentres.length > 0) {
 					this.agentwriter.close();
+				}
+				if(this.nets.length > 0) {
+					for(int i = 0; i < this.nets.length; i++) {
+						this.netwriters[i].close();
+					}
 				}
 			} catch (IOException e) {
 				System.out.println("Writer not closing...");
@@ -332,8 +358,8 @@ public abstract class Model extends SimState  {
 				return rand.nextInt(Integer.parseInt(distparams[0]));
 			case 'G':
 				// Gamma distribution, for things that are generally small (but above 0), with some larger values - with optional min
-				if(distparams.length < 3) return(drawGamma(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), 0, rand));
-				return drawGamma(Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), Double.parseDouble(distparams[2]), rand);
+				if(distparams.length < 3) return(distSampler.drawGamma(rand, Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), 0));
+				return distSampler.drawGamma(rand, Double.parseDouble(distparams[0]), Double.parseDouble(distparams[1]), Double.parseDouble(distparams[2]));
 			}
 		}catch(NumberFormatException e) {
 			// this and a few other things will result in returning NaN
@@ -473,7 +499,6 @@ public abstract class Model extends SimState  {
 			// run the simulation for the designated number of steps
 			while(schedule.getSteps() < steps) {
 				// if this is the right step according to the test interval, write the results for this step
-				// TODO - give it the option to delay when it starts collecting data
 				if(schedule.getSteps() >= teststart && schedule.getSteps()%testint == 0) {
 					writeResults(s, p, false);
 				}
@@ -604,7 +629,38 @@ public abstract class Model extends SimState  {
 							res += getResult(r, this.agents[o], this.agentclass) + this.sep;
 						}
 						// write params, the agent's number, and the results to the agent results
-						this.agentwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + o + this.sep + res + "\n");
+						this.agentwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + o + this.sep + this.agents[o] + this.sep + res + "\n");
+					}
+				}
+			}
+			// also get network results (if any networks have been provided to test, and this is the right interval)
+			if(this.nets.length > 0 && (this.netint == 0 || this.schedule.getSteps()%this.netint == 0)) {
+				// for each network
+				for(int i = 0; i < this.nets.length; i ++) {
+					// this will all be under a try-catch because I have to use reflection to get the networks
+					try {
+						// this gets the field from the class
+						Field f = this.subclass.getField(nets[i]);
+						// and this grabs the actual network belonging to this object
+						Network n = (Network) f.get(this);
+						// make sure the network isn't null
+						if(n != null) {
+							// then I can go through the network and add all the edges to the file
+							for(Edge[] edges : n.getAdjacencyList(true)) {
+								for(Edge e : edges) {
+									// make sure it's not trying to access a null edge, just in case
+									if(e != null) {
+										// add that edge to the file (along with all the other info about the run that it's part of)
+										this.netwriters[i].write("" + s + this.sep + schedule.getSteps() + this.sep + params + e.getFrom() + this.sep + 
+												e.getTo() + this.sep + e.getInfo() + this.sep + "\n");
+									}
+								}
+							}
+						}
+					} catch(NoSuchFieldException|IllegalAccessException e) {
+						System.out.println("Cannot access " + nets[i]);
+					} catch(ClassCastException e) {
+						System.out.println(nets[i] + " is not a network");
 					}
 				}
 			}
@@ -658,12 +714,18 @@ public abstract class Model extends SimState  {
 			if(this.autoparams || this.autores) {
 				// first store the subclass
 				setClasses();
+				// this will sore the list of networks
+				String networks = "";
 				Field[] fields = this.subclass.getDeclaredFields();
 				for(int f = 0; f < fields.length; f++) {
 					// make sure each field is a type it can handle
 					Class c = fields[f].getType();
 					if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE)
 						writer.write(fields[f].getName() + " = \n");
+					else if(c == Network.class) {
+						// also grab networks to suggest with edgelist
+						networks += " " + fields[f].getName();
+					}
 				}
 				// and then add agent info at the bottom
 				writer.write("*agentInfo = ");
@@ -671,6 +733,10 @@ public abstract class Model extends SimState  {
 				fields = this.agentclass.getDeclaredFields();
 				for(int f = 0; f < fields.length; f++) {
 					writer.write(fields[f].getName() + " ");
+				}
+				// also add edge list if there are networks
+				if(networks.length() > 0) {
+					writer.write("\n*edgeList =" + networks);
 				}
 			}
 			writer.close();
@@ -746,90 +812,4 @@ public abstract class Model extends SimState  {
 			}
 		}
 	}
-	
-	/*
-	 * helper utility to  draw a random value from a normal distribution within a certain range using a while-loop
-	 * TODO - phase out
-	 */
-	public double drawRange(double val, double var, double min, double max) {
-		boolean within = false;
-		double draw = 0;
-		while(!within) {
-			// draw variance from a normal distribution
-			draw = this.random.nextGaussian()*var;
-			// check to see if its in the right range;
-			if(val+draw >= min && val+draw <= max) {
-				within = true;
-			}
-		}
-		// once a reasonable value has been found, return it
-		return draw+val;
-	}
-	
-	/*
-	 * helper utility to draw a random value from a nicely shaped Erlang distribution (based around mode and standard deviation)
-	 * 	(note: struggles with large values - algorithm runs mean^2/var iterations
-	 *   scale by dividing mean and sd by a constant, convert sd to variance by squaring, and then scale back up the result)
-	 *   TODO - phase out for GammaNormalized
-	 */
-	public double drawErlang(double mode, double sd) {
-		// if the standard deviation is too low, just use a normal, that should be fine (otherwise it'll take a while and return infs)
-		if(sd < .02) return drawRange(mode, sd, 0, Double.MAX_VALUE);
-		double v = Math.pow(2*sd, 2);
-		double m = (1+Math.sqrt(1 + 4*v))/2;
-		// switch to draw from Gamma
-		double draw = Distributions.nextErlang(v, m, this.random);
-		if(draw == Double.POSITIVE_INFINITY) return mode;
-		return draw*mode;
-	}
-	
-	/*
-	 * calls drawErlang with a min other than 0 by subtracting and then adding back
-	 */
-	public double drawErlang(double mode, double sd, double min) {
-		return drawErlang(mode-min, sd) + min;
-	}
-	
-	/*
-	 * Wrapper for GammaNormalized that adjusts the mean and min
-	 */
-	public double drawGamma(double mean, double sd, double min, MersenneTwisterFast random) {
-		GammaNormalized gamma = GammaNormalized.initialize(sd, random);
-		return gamma.nextDouble()*(mean-min) + min;
-	}
-	
-	/*
-	 * option to run Gamma with the default random generator
-	 */
-	public double drawGamma(double mean, double sd, double min) {
-		return drawGamma(mean, sd, min, this.random);
-	}
-	
-	/*
-	 * helper utility to draw a random value from a nicely shaped Beta distribution between 0 and 1 (based around mode and "concentration")
-	 * TODO - phase out
-	 */
-	public double drawBetaMode(double mode, double var) {
-		double a = mode*(500*var)+1;
-		double b = (1-mode)*(500*var)+1;
-		Beta beta = new Beta(a, b, this.random);
-		double draw = beta.nextDouble();
-		return draw;
-	}
-	
-	/*
-	 * Draws from a beta distribution based on mean and inverse square root sample size (to allow for a parameter between 0 and 1)
-	 */
-	public double drawBeta(double mean, double var) {
-		// since this involves dividing by variation, make sure it's greater than 0
-		if(var < .0001) return mean;
-		// also make sure the mean is between .0001 and .9999 just to be safe
-		mean = Math.min(Math.max(mean, .0001), .9999);
-		double a = mean/Math.pow(var, 2);
-		double b = (1-mean)/Math.pow(var, 2);
-		Beta beta = new Beta(a, b, this.random);
-		return beta.nextDouble();
-	}
-	
-
 }
