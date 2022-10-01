@@ -145,8 +145,12 @@ public abstract class Model extends SimState  {
 			// loop through the file
 			String line;
 			while((line = file.readLine()) != null) {
-				// split each line at the equals sign
-				String[] splitline = line.split("=");
+				// % is used as a comment character, so skip any line that starts with it
+				if(line.charAt(0) == '%') continue;
+				// and otherwise only look at what comes before a %
+				String[] readline = line.split("%");
+				// then split each line at the equals sign
+				String[] splitline = readline[0].split("=");
 				// first check for lines without anything after the equals, or no equals at all
 				if(splitline.length < 2 || splitline[1].trim().length() < 1) {
 					// if there's actually something there and we're automatically gathering results, do that
@@ -260,10 +264,11 @@ public abstract class Model extends SimState  {
 				System.out.println("Something's wrong with your results files!");
 				System.exit(0);
 			}
-			// draw random parameters for a set number of iterations (from a separate random seed), and then sweep/test in each
+			// draw random parameters from a separate random seed
 			MersenneTwisterFast paramgen = new MersenneTwisterFast();
 			paramgen.setSeed(this.seed);
-			for(int i = 0; i < this.iters; i++) {
+			// draw the designated number of random iterations (at least 1), and then sweep parameters/test each
+			for(int i = 0; i < Math.max(this.iters, 1); i++) {
 				// randomly draw all the randparams
 				for(int r = 0; r < this.randparams.size(); r++) {
 					double val = parseRand(paramgen, this.randdists.get(r));
@@ -700,7 +705,41 @@ public abstract class Model extends SimState  {
 		try {
 			// create a writer
 			BufferedWriter writer = new BufferedWriter(new FileWriter("inputTemplate.txt"));
-			// start by adding the key parameters to the template
+			// start with a 'brief' explanation of how to use the input file
+			writer.write("% How to use:\n"
+					+ "% This file allows you to set model parameter values for multiple simulations, and collect the results."
+					+ " It automatically lists all String, integer, and double fields from your model class,"
+					+ " as well as several key parameters (indicated by an asterisk '*') which are used for managing running and collecting data from the model.\n"
+					+ "% To assign a value to a parameter, put the desired value after the equals sign."
+					+ " Each paramter can be assigned mutliple values to run a series of simulations with different parameter values as follows:\n"
+					+ "%\tparameter = 0 1 2\n"
+					+ "% If multiple parameters are each assigned multiple values, then simulations will be run for each combination of parameter values."
+					+ " (You can assign as many values as you want to as many parameters as you want, but be careful as the number of simulations grows quickly.)\n"
+					+ "% Parameter values can also be drawn randomly from a uniform (U - continuous, or C - discrete), normal (N), or gamma (G) distribution in the form:\n"
+					+ "%\tparameter = U(<start>,<stop>)\n"
+					+ "%\tparameter = C(<number of discrete options>)\n"
+					+ "%\tparameter = N(<mean>,<standard deviation>)\n"
+					+ "%\tparameter = G(<mean>,<standard deviation>,<optional minimum>)\n"
+					+ "% To collect data on a field at the model level, leave the line empty as follows:\n"
+					+ "%\tresult = \n"
+					+ "% All fields that you don't want to set or collect should be removed."
+					+ " You can add additional parameter and result names that are not fields to handle them manually in your model class."
+					+ " All model-level results will be outputted in a  file named '<fname>endresults.txt' at the end of each simulation"
+					+ " and in a file named '<fname>timeresults.txt' at set intervals throughout each simulation.\n"
+					+ "% To collect data at the agent level, use the key parameter '*agentInfo',"
+					+ " which is automatically followed by the names of all String, integer, and double fields of the agent class."
+					+ " Keep the fields that you want to collect data on and delete those you do not want to collect data on."
+					+ " You can also add additional result names that are not fields to handle them manually in your model class."
+					+ " All agent-level results will be outputted in a file named '<fname>agentresults.txt' at set intervals throughout each simulation."
+					+ " If you don't want to collect any agent-level data, delete the entire *agentInfo parameter.\n"
+					+ "% To collect network data, use the key parameter '*edgeList',"
+					+ " which is automatically followed by the names of all the Network type fields of your model class."
+					+ " Keep the networks that you want to get an edgelist of and delete those you do not want an edgelist of."
+					+ " The edgelists for each network will be outputted in files named <fname><network name>edgelist.txt at set intervals throughout each simulation."
+					+ " If you don't want to collect any network data, delete the entire *edgeList parameter.\n"
+					+ "% Comments (any text to be ignored when running the simulation) are indicated by the '%' character.");
+			// then add the key parameters to the template
+			// TODO - add comments to keyparams
 			for(int k = 0; k < keyparams.length; k++) {
 				writer.write("*" + keyparams[k] + " = \n");
 			}
