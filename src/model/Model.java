@@ -715,7 +715,7 @@ public abstract class Model extends SimState  {
 					+ "%\tparameter = 0 1 2\n"
 					+ "% If multiple parameters are each assigned multiple values, then simulations will be run for each combination of parameter values."
 					+ " (You can assign as many values as you want to as many parameters as you want, but be careful as the number of simulations grows quickly.)\n"
-					+ "% Parameter values can also be drawn randomly from a uniform (U - continuous, or C - discrete), normal (N), or gamma (G) distribution in the form:\n"
+					+ "% Parameter values can also be drawn randomly from a uniform (U - continuous, or C - discrete choices), normal (N), or gamma (G) distribution in the form:\n"
 					+ "%\tparameter = U(<start>,<stop>)\n"
 					+ "%\tparameter = C(<number of discrete options>)\n"
 					+ "%\tparameter = N(<mean>,<standard deviation>)\n"
@@ -737,15 +737,24 @@ public abstract class Model extends SimState  {
 					+ " Keep the networks that you want to get an edgelist of and delete those you do not want an edgelist of."
 					+ " The edgelists for each network will be outputted in files named <fname><network name>edgelist.txt at set intervals throughout each simulation."
 					+ " If you don't want to collect any network data, delete the entire *edgeList parameter.\n"
-					+ "% Comments (any text to be ignored when running the simulation) are indicated by the '%' character.");
-			// then add the key parameters to the template
-			// TODO - add comments to keyparams
-			for(int k = 0; k < keyparams.length; k++) {
-				writer.write("*" + keyparams[k] + " = \n");
-			}
+					+ "% Comments (any text to be ignored when running the simulation) are indicated by the '%' character.\n\n");
+			// then add the key parameters to the template, with comments
+			writer.write("% Key Parameters:\n");
+			writer.write("*seed =  % random seed used for the first replicate for each combination of parameter values (incremented for each additional replicate)\n");
+			writer.write("*sep =  % separator character for the output file (defaults to ',')\n");
+			writer.write("*steps =  % number of timesteps each simulation is run for\n");
+			writer.write("*iters =  % number of sets of randomly drawn parameters\n");
+			writer.write("*reps =  % number of simulations run for each combination of paramter values\n");
+			writer.write("*fname =  % beginning of the names of all output files\n");
+			writer.write("*testint =  % how often timecourse data is collected (in steps)\n");
+			writer.write("*teststart =  % how many steps into each simulation to start collecting timecourse data, defaults to 0 (the beginning of the simulation)\n");
+			writer.write("*gui =  % whether the simulation runs with or without GUI (defaults to false, only runs the initial set of parameter values if true)\n");
+			writer.write("*agentint =  % how often agent-level data is collected (defaults to testint)\n");
+			writer.write("*netint =  % how often edgelists are outputted (defaults to testint)\n");
 			// initialize the list of parameter names
 			setNames();
 			// then add all the listed input parameters
+			writer.write("% Model Parameters:\n");
 			for(int p = 0; p < paramnames.length; p++) {
 				writer.write(paramnames[p] + " = \n");
 			}
@@ -767,15 +776,19 @@ public abstract class Model extends SimState  {
 					}
 				}
 				// and then add agent info at the bottom
+				writer.write("% Agent Parameters:\n");
 				writer.write("*agentInfo = ");
-				// with all of the agent's fields as suggested results
-				fields = this.agentclass.getDeclaredFields();
-				for(int f = 0; f < fields.length; f++) {
-					writer.write(fields[f].getName() + " ");
+				// with all of the agent's fields as suggested results (unless the agent class is null)
+				if(this.agentclass != null) {
+					fields = this.agentclass.getDeclaredFields();
+					for(int f = 0; f < fields.length; f++) {
+						writer.write(fields[f].getName() + " ");
+					}
 				}
 				// also add edge list if there are networks
 				if(networks.length() > 0) {
-					writer.write("\n*edgeList =" + networks);
+					writer.write("\n% Networks:\n");
+					writer.write("*edgeList =" + networks);
 				}
 			}
 			writer.close();

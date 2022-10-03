@@ -1,0 +1,32 @@
+% How to use:
+% This file allows you to set model parameter values for multiple simulations, and collect the results. It automatically lists all String, integer, and double fields from your model class, as well as several key parameters (indicated by an asterisk '*') which are used for managing running and collecting data from the model.
+% To assign a value to a parameter, put the desired value after the equals sign. Each paramter can be assigned mutliple values to run a series of simulations with different parameter values as follows:
+%	parameter = 0 1 2
+% If multiple parameters are each assigned multiple values, then simulations will be run for each combination of parameter values. (You can assign as many values as you want to as many parameters as you want, but be careful as the number of simulations grows quickly.)
+% Parameter values can also be drawn randomly from a uniform (U - continuous, or C - discrete choices), normal (N), or gamma (G) distribution in the form:
+%	parameter = U(<start>,<stop>)
+%	parameter = C(<number of discrete options>)
+%	parameter = N(<mean>,<standard deviation>)
+%	parameter = G(<mean>,<standard deviation>,<optional minimum>)
+% To collect data on a field at the model level, leave the line empty as follows:
+%	result = 
+% All fields that you don't want to set or collect should be removed. You can add additional parameter and result names that are not fields to handle them manually in your model class. All model-level results will be outputted in a  file named '<fname>endresults.txt' at the end of each simulation and in a file named '<fname>timeresults.txt' at set intervals throughout each simulation.
+% To collect data at the agent level, use the key parameter '*agentInfo', which is automatically followed by the names of all String, integer, and double fields of the agent class. Keep the fields that you want to collect data on and delete those you do not want to collect data on. You can also add additional result names that are not fields to handle them manually in your model class. All agent-level results will be outputted in a file named '<fname>agentresults.txt' at set intervals throughout each simulation. If you don't want to collect any agent-level data, delete the entire *agentInfo parameter.
+% To collect network data, use the key parameter '*edgeList', which is automatically followed by the names of all the Network type fields of your model class. Keep the networks that you want to get an edgelist of and delete those you do not want an edgelist of. The edgelists for each network will be outputted in files named <fname><network name>edgelist.txt at set intervals throughout each simulation. If you don't want to collect any network data, delete the entire *edgeList parameter.
+% Comments (any text to be ignored when running the simulation) are indicated by the '%' character.
+
+% Key Parameters:
+*seed =  % random seed used for the first replicate for each combination of parameter values (incremented for each additional replicate)
+*sep =  % separator character for the output file (defaults to ',')
+*steps =  % number of timesteps each simulation is run for
+*iters =  % number of sets of randomly drawn parameters
+*reps =  % number of simulations run for each combination of paramter values
+*fname =  % beginning of the names of all output files
+*testint =  % how often timecourse data is collected (in steps)
+*teststart =  % how many steps into each simulation to start collecting timecourse data, defaults to 0 (the beginning of the simulation)
+*gui =  % whether the simulation runs with or without GUI (defaults to false, only runs the initial set of parameter values if true)
+*agentint =  % how often agent-level data is collected (defaults to testint)
+*netint =  % how often edgelists are outputted (defaults to testint)
+% Model Parameters:
+% Agent Parameters:
+*agentInfo = 
