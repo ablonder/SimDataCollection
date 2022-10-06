@@ -20,11 +20,20 @@ public class ModelTemplate extends Model{
 	}
 	
 	/*
-	 * Implements an abstract method from the Model class to tell it the model class and agent class
+	 * Implement an abstract method from the Model class to tell it the model class and agent class
 	 */
 	public void setClasses() {
 		this.subclass = ModelTemplate.class;
 		// TODO - set this.agentclass = <Agent>.class
+	}
+	
+	/*
+	 * Implement abstract start method from MASON's SimState to initialize each simulation
+	 */
+	public void start() {
+		super.start();
+		// TODO - to gather agent-level data, initialize Object[] agents from the Model class
+		// and add all agents you want to gather data on to it
 	}
 	
 	/*
