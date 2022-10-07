@@ -591,7 +591,8 @@ public abstract class Model extends SimState  {
 		} catch(NoSuchFieldException e) {
 			// that's okay, the user can decide to do other things with it
 		} catch (IllegalAccessException e) {
-			// this is also okay
+			// this can also be okay, but should tell the user
+			System.out.println("Unable to access " + pname + ".");
 		} catch (NumberFormatException e) {
 			// this is hypothetically okay, though it should tell the user
 			System.out.println("Unable to set " + pname + " to " + pval + ": Number Format Exception!");
@@ -691,7 +692,8 @@ public abstract class Model extends SimState  {
 			} catch(NoSuchFieldException e) {
 				// that's okay, this will just have to be dealt with in the subclass
 			} catch(IllegalAccessException e) {
-				// this is also okay
+				// this is also hypothetically okay, but should tell the user
+				System.out.println("Unable to access " + res + ".");
 			}
 		}
 		return(p);

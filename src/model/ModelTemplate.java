@@ -5,6 +5,9 @@ package model;
  */
 public class ModelTemplate extends Model{
 	
+	// All fields that you want to vary or output need to be public so that can be accessed by the Model class 
+	
+	
 	/*
 	 * Empty constructor to generate an input template file (inputTemplate.txt)
 	 */
@@ -17,6 +20,14 @@ public class ModelTemplate extends Model{
 	 */
 	public ModelTemplate(String fname) {
 		super(fname);
+	}
+	
+	/*
+	 * Constructor to split one input file (fname) into multiple input files,
+	 * one for each combination of values of the given parameters (params)
+	 */
+	public ModelTemplate(String fname, String[] params, String[] paramkeys) {
+		super(fname, params, paramkeys);
 	}
 	
 	/*
