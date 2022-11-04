@@ -444,7 +444,7 @@ public abstract class Model extends SimState  {
 			}
 			// if this file will hold agent data, add the headers for the categories of agent results
 			if(agent) {
-				writer.write("Agent#" + this.sep + "Agent" + this.sep);
+				writer.write("AgentID" + this.sep + "Agent" + this.sep);
 			}
 			// add the headers for all the results
 			for(int r = 0; r < res.length; r++) {
