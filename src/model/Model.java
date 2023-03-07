@@ -146,7 +146,7 @@ public abstract class Model extends SimState  {
 			String line;
 			while((line = file.readLine()) != null) {
 				// % is used as a comment character, so skip any line that starts with it
-				if(line.charAt(0) == '%') continue;
+				if(line.length() < 1 || line.charAt(0) == '%') continue;
 				// and otherwise only look at what comes before a %
 				String[] readline = line.split("%");
 				// then split each line at the equals sign
@@ -590,6 +590,7 @@ public abstract class Model extends SimState  {
 			else if(t == Character.TYPE) f.setChar(this, pval.charAt(0));
 		} catch(NoSuchFieldException e) {
 			// that's okay, the user can decide to do other things with it
+			System.out.println("Unable to access " + pname + ".");
 		} catch (IllegalAccessException e) {
 			// this can also be okay, but should tell the user
 			System.out.println("Unable to access " + pname + ".");
@@ -713,6 +714,7 @@ public abstract class Model extends SimState  {
 					+ " It automatically lists all String, integer, and double fields from your model class,"
 					+ " as well as several key parameters (indicated by an asterisk '*') which are used for managing running and collecting data from the model.\n"
 					+ "% To assign a value to a parameter, put the desired value after the equals sign."
+					+ " Strings and characters will be read as is and should not be surrounded by quotation marks."
 					+ " Each paramter can be assigned mutliple values to run a series of simulations with different parameter values as follows:\n"
 					+ "%\tparameter = 0 1 2\n"
 					+ "% If multiple parameters are each assigned multiple values, then simulations will be run for each combination of parameter values."
@@ -724,7 +726,9 @@ public abstract class Model extends SimState  {
 					+ "%\tparameter = G(<mean>,<standard deviation>,<optional minimum>)\n"
 					+ "% To collect data on a field at the model level, leave the line empty as follows:\n"
 					+ "%\tresult = \n"
-					+ "% All fields that you don't want to set or collect should be removed."
+					+ "% All fields that you don't want to set or collect, including key parameters, should be removed."
+					+ " Only key parameters can use default values (where inidcated). All model parameters must be set in the input file."
+					+ " All fields you want to set or collect must be made public."
 					+ " You can add additional parameter and result names that are not fields to handle them manually in your model class."
 					+ " All model-level results will be outputted in a  file named '<fname>endresults.txt' at the end of each simulation"
 					+ " and in a file named '<fname>timeresults.txt' at set intervals throughout each simulation.\n"
@@ -743,7 +747,7 @@ public abstract class Model extends SimState  {
 			// then add the key parameters to the template, with comments
 			writer.write("% Key Parameters:\n");
 			writer.write("*seed =  % random seed used for the first replicate for each combination of parameter values (incremented for each additional replicate)\n");
-			writer.write("*sep =  % separator character for the output file (defaults to ',')\n");
+			writer.write("*sep =  % separator character for the output file (defaults to comma separated)\n");
 			writer.write("*steps =  % number of timesteps each simulation is run for\n");
 			writer.write("*iters =  % number of sets of randomly drawn parameters\n");
 			writer.write("*reps =  % number of simulations run for each combination of paramter values\n");
