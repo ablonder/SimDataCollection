@@ -355,6 +355,12 @@ public abstract class Model extends SimState  {
 						this.netwriters[i].close();
 					}
 				}
+				if(this.lists.length > 0) {
+					this.listwriter.close();
+				}
+				if(this.agentlists.length > 0) {
+					this.agentlistwriter.close();
+				}
 			} catch (IOException e) {
 				System.out.println("Writer not closing...");
 			}
