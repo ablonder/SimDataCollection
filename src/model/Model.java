@@ -878,7 +878,7 @@ public abstract class Model extends SimState  {
 						// make sure each field is a type it can handle
 						Class c = fields[f].getType();
 						if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE || Collection.class.isAssignableFrom(c) || c.isArray())
-							writer.write(fields[f].getName());
+							writer.write(fields[f].getName() + " ");
 					}
 				}
 				// also add edge list if there are networks
