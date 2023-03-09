@@ -11,9 +11,11 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 
 import ec.util.MersenneTwisterFast;
 import sim.engine.*;
@@ -42,11 +44,15 @@ public abstract class Model extends SimState  {
 	public BufferedWriter agentwriter;
 	// list of file writers for edgelists (only created if networks are provided to get edgelists from)
 	public BufferedWriter[] netwriters;
+	// file writer for list results at the model level
+	public BufferedWriter listwriter;
+	// file writer for list results at the agent level
+	public BufferedWriter agentlistwriter;
 	// the separator for writing results to file
 	public char sep = ',';
 	// key parameters used in every model (as class variables for access if the user wants them)
 	public static String[] keyparams = {"seed", "sep", "steps", "iters", "reps", "fname", "testint", "teststart",
-			"gui", "agentint", "netint"};
+			"gui", "agentint", "netint", "listint"};
 	public int seed = 0;
 	public int steps;
 	public int iters = 1;
@@ -57,6 +63,7 @@ public abstract class Model extends SimState  {
 	public boolean gui = false;
 	public int agentint = 0;
 	public int netint = 0;
+	public int listint = 0;
 	// list of parameter names - to be made in the child class
 	public String[] paramnames;
 	// indicates whether to automatically use the subclass fields as parameters - default to true
@@ -72,6 +79,10 @@ public abstract class Model extends SimState  {
 	public Object[] agents;
 	// list of networks to be gathered from the model
 	public String[] nets = new String[0];
+	// list of list type results to be gathered from the model
+	public String[] lists = new String[0];
+	// and from the agents
+	public String[] agentlists = new String[0];
 	// list of results names added from file for splitting
 	public String[] fileres;
 	// the subclass for use in accessing its fields
@@ -137,8 +148,10 @@ public abstract class Model extends SimState  {
 		ArrayList<String> tempparams = new ArrayList<String>();
 		// and an array list of parameter values
 		ArrayList<String> tempvals = new ArrayList<String>();
-		// and an array list of results categories
+		// and an array list of results variables
 		ArrayList<String> tempres = new ArrayList<String>();
+		// and an array list of list-type results
+		ArrayList<String> templistres = new ArrayList<String>();
 		try {
 			// now to open the file and start reading
 			BufferedReader file = new BufferedReader(new FileReader(fname));
@@ -155,18 +168,46 @@ public abstract class Model extends SimState  {
 				if(splitline.length < 2 || splitline[1].trim().length() < 1) {
 					// if there's actually something there and we're automatically gathering results, do that
 					if(this.autores && splitline[0].length() > 0) {
-						tempres.add(splitline[0].trim());
+						String r = splitline[0].trim();
+						// check if it's a list
+						try {
+							Field f = this.subclass.getField(r);
+							Class t = f.getType();
+							if(Collection.class.isAssignableFrom(t) || Array.class.isAssignableFrom(t)) {
+								templistres.add(r);
+							} else {
+								tempres.add(r);
+							}
+						}catch(NoSuchFieldException e) {
+							tempres.add(r);
+						}
 					}
 				} else if(this.autores && splitline[0].trim().equals("*agentInfo") && splitline[1].length() > 1) {
 					// otherwise, try to catch agentInfo (which should be a key parameter)
 					// split the parameters to get the data gathered from each agent
 					ArrayList<String> newagentres = new ArrayList<String>(Arrays.asList(splitline[1].trim().split(" ")));
+					// also get the list of list-type agent parameters
+					ArrayList<String> alistres = new ArrayList<String>(Arrays.asList(this.agentlists));
 					// grab the existing list of agent parameters
 					ArrayList<String> oldagentres = new ArrayList<String>(Arrays.asList(this.agentres));
-					// concatenate the two
-					oldagentres.addAll(newagentres);
-					// store the resulting complete list as an array
+					// loop through the new list of agent parameters to add to the list (and check for lists)
+					for(String r : newagentres) {
+						// check if the parameter is a list of some type
+						try {
+							Field f = this.agentclass.getField(r);
+							Class t = f.getType();
+							if(Collection.class.isAssignableFrom(t) || Array.class.isAssignableFrom(t)) {
+								alistres.add(r);
+							} else {
+								oldagentres.add(r);
+							}
+						}catch(NoSuchFieldException e) {
+							oldagentres.add(r);
+						}
+					}
+					// store the resulting complete lists as arrays
 					this.agentres = oldagentres.toArray(new String[oldagentres.size()]);
+					this.agentlists = alistres.toArray(new String[alistres.size()]);
 				} else if(this.autores && splitline[0].trim().equals("*edgeList") && splitline[1].length() > 1) {
 					// also catch the edgeList (which should also be a key parameter)
 					// split the following parameters to get a list of network names to create edgelists of
@@ -195,6 +236,8 @@ public abstract class Model extends SimState  {
 			ArrayList<String> res = new ArrayList<String>(Arrays.asList(resnames));
 			res.addAll(tempres);
 			resnames = res.toArray(new String[res.size()]);
+			// and also save the list results
+			this.lists = templistres.toArray(new String[templistres.size()]);
 			// now I can set the seed
 			this.setSeed(this.seed);
 			// and return args
@@ -259,6 +302,16 @@ public abstract class Model extends SimState  {
 						this.netwriters[i] = new BufferedWriter(new FileWriter(this.fname + this.nets[i] + "edgelist.txt"));
 						makeHeader(this.netwriters[i], true, false, new String[]{"from", "to", "info"});
 					}
+				}
+				// and if there are list results, create files for those at the model level
+				if(this.lists.length > 0) {
+					this.listwriter = new BufferedWriter(new FileWriter(this.fname + "listresults.txt"));
+					makeHeader(this.listwriter, true, false, new String[] {"List", "Values"});
+				}
+				// and at the agent level
+				if(this.agentlists.length > 0) {
+					this.agentlistwriter = new BufferedWriter(new FileWriter(this.fname + "agentlistresults.txt"));
+					makeHeader(this.agentlistwriter, true, true, new String[] {"List", "Values"});
 				}
 			} catch(IOException e) {
 				System.out.println("Something's wrong with your results files!");
@@ -671,6 +724,29 @@ public abstract class Model extends SimState  {
 					}
 				}
 			}
+			// and finally get list results
+			if(this.listint == 0 || this.schedule.getSteps()%this.listint == 0) {
+				// at the model level
+				if(this.lists.length > 0) {
+					// loop through each list and print it out
+					for(String l : this.lists) {
+						String lres = getResult(l, this, this.subclass);
+						// write the seed, timestep, params, and results to the timecourse results
+						this.listwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + l + this.sep + lres + "\n");
+					}
+				}
+				// and the agent level
+				if(this.agentlists.length > 0) {
+					for(String l : this.agentlists) {
+						for(int i = 0; i < this.agents.length; i++) {
+							if(this.agents[i] != null) {
+								String lres = getResult(l, this.agents[i], this.agentclass);
+								this.agentlistwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + i + this.sep + this.agents[i] + this.sep + l + this.sep + lres + "\n");
+							}
+						}
+					}
+				}
+			}
 		} catch(IOException e) {
 			System.out.println("Failed to write results to file...");
 		}
@@ -688,8 +764,18 @@ public abstract class Model extends SimState  {
 		// start by checking to see if it's an actual field, the subclass will do something else if it wants
 			try {
 				Field f = c.getField(res);
+				// get the value of that field
+				Object val = f.get(o);
+				// then check if it's a list to add its values
+				if(val instanceof Collection) {
+					p = Arrays.toString(((Collection)val).toArray());
+				} else if(val instanceof Array) {
+					p = Arrays.toString((Object[]) val);
+				}else {
+					// otherwise add it to the string directly
+					p += f.get(o);
+				}
 				// things that don't handle this well will just have to be dealt with elsewhere
-				p += f.get(o);
 			} catch(NoSuchFieldException e) {
 				// that's okay, this will just have to be dealt with in the subclass
 			} catch(IllegalAccessException e) {
@@ -745,18 +831,19 @@ public abstract class Model extends SimState  {
 					+ " If you don't want to collect any network data, delete the entire *edgeList parameter.\n"
 					+ "% Comments (any text to be ignored when running the simulation) are indicated by the '%' character.\n\n");
 			// then add the key parameters to the template, with comments
-			writer.write("% Key Parameters:\n");
-			writer.write("*seed =  % random seed used for the first replicate for each combination of parameter values (incremented for each additional replicate)\n");
-			writer.write("*sep =  % separator character for the output file (defaults to comma separated)\n");
-			writer.write("*steps =  % number of timesteps each simulation is run for\n");
-			writer.write("*iters =  % number of sets of randomly drawn parameters\n");
-			writer.write("*reps =  % number of simulations run for each combination of paramter values\n");
-			writer.write("*fname =  % beginning of the names of all output files\n");
-			writer.write("*testint =  % how often timecourse data is collected (in steps)\n");
-			writer.write("*teststart =  % how many steps into each simulation to start collecting timecourse data, defaults to 0 (the beginning of the simulation)\n");
-			writer.write("*gui =  % whether the simulation runs with or without GUI (defaults to false, only runs the initial set of parameter values if true)\n");
-			writer.write("*agentint =  % how often agent-level data is collected (defaults to testint)\n");
-			writer.write("*netint =  % how often edgelists are outputted (defaults to testint)\n");
+			writer.write("% Key Parameters:\n"
+					+ "*seed =  % random seed used for the first replicate for each combination of parameter values (incremented for each additional replicate)\n"
+					+ "*sep =  % separator character for the output file (defaults to comma separated)\n"
+					+ "*steps =  % number of timesteps each simulation is run for\n"
+					+ "*iters =  % number of sets of randomly drawn parameters\n"
+					+ "*reps =  % number of simulations run for each combination of paramter values\n"
+					+ "*fname =  % beginning of the names of all output files\n"
+					+ "*testint =  % how often timecourse data is collected (in steps)\n"
+					+ "*teststart =  % how many steps into each simulation to start collecting timecourse data, defaults to 0 (the beginning of the simulation)\n"
+					+ "*gui =  % whether the simulation runs with or without GUI (defaults to false, only runs the initial set of parameter values if true)\n"
+					+ "*agentint =  % how often agent-level data is collected (defaults to testint)\n"
+					+ "*netint =  % how often edgelists are outputted (defaults to testint)\n"
+					+ "*listint = % how often list-type data is outputted (defaults to testint)\n");
 			// initialize the list of parameter names
 			setNames();
 			// then add all the listed input parameters
