@@ -173,7 +173,7 @@ public abstract class Model extends SimState  {
 						try {
 							Field f = this.subclass.getField(r);
 							Class t = f.getType();
-							if(Collection.class.isAssignableFrom(t) || Array.class.isAssignableFrom(t)) {
+							if(Collection.class.isAssignableFrom(t) || t.isArray()) {
 								templistres.add(r);
 							} else {
 								tempres.add(r);
@@ -196,7 +196,7 @@ public abstract class Model extends SimState  {
 						try {
 							Field f = this.agentclass.getField(r);
 							Class t = f.getType();
-							if(Collection.class.isAssignableFrom(t) || Array.class.isAssignableFrom(t)) {
+							if(Collection.class.isAssignableFrom(t) || t.isArray()) {
 								alistres.add(r);
 							} else {
 								oldagentres.add(r);
@@ -861,7 +861,7 @@ public abstract class Model extends SimState  {
 				for(int f = 0; f < fields.length; f++) {
 					// make sure each field is a type it can handle
 					Class c = fields[f].getType();
-					if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE || Collection.class.isAssignableFrom(c) || Array.class.isAssignableFrom(c))
+					if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE || Collection.class.isAssignableFrom(c) || c.isArray())
 						writer.write(fields[f].getName() + " = \n");
 					else if(c == Network.class) {
 						// also grab networks to suggest with edgelist
@@ -877,7 +877,7 @@ public abstract class Model extends SimState  {
 					for(int f = 0; f < fields.length; f++) {
 						// make sure each field is a type it can handle
 						Class c = fields[f].getType();
-						if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE || Collection.class.isAssignableFrom(c) || Array.class.isAssignableFrom(c))
+						if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE || Collection.class.isAssignableFrom(c) || c.isArray())
 							writer.write(fields[f].getName());
 					}
 				}
