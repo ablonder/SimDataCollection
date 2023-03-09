@@ -775,7 +775,7 @@ public abstract class Model extends SimState  {
 				if(val instanceof Collection) {
 					p = Arrays.toString(((Collection)val).toArray());
 				} else if(val.getClass().isArray()) {
-					p = Arrays.toString(((Collection)val).toArray());
+					p = Arrays.toString((Object[])val);
 				}else {
 					// otherwise add it to the string directly
 					p += f.get(o);
