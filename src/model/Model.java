@@ -142,8 +142,9 @@ public abstract class Model extends SimState  {
 	}
 	
 	public String[] readFile(String fname) {
-		// run set names to initialize everything
+		// run set names and classes to initialize everything
 		setNames();
+		setClasses();
 		// I'm going to start with an array list of parameters because it needs to grow
 		ArrayList<String> tempparams = new ArrayList<String>();
 		// and an array list of parameter values
@@ -601,8 +602,6 @@ public abstract class Model extends SimState  {
 	 * the default is to use the parameter names as field names and assume they line up
 	 */
 	public void setParams(String[] params) {
-		// get the subclass
-		setClasses();
 		// loop through all named results and initialize to zero
 		for(int r = 0; r < resnames.length; r++) {
 			setParamVal(subclass, resnames[r], "0");
