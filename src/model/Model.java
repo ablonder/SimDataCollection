@@ -797,7 +797,7 @@ public abstract class Model extends SimState  {
 			// start with a 'brief' explanation of how to use the input file
 			writer.write("% How to use:\n"
 					+ "% This file allows you to set model parameter values for multiple simulations, and collect the results."
-					+ " It automatically lists all String, integer, and double fields from your model class,"
+					+ " It automatically lists all primitive, String, and list type fields from your model class,"
 					+ " as well as several key parameters (indicated by an asterisk '*') which are used for managing running and collecting data from the model.\n"
 					+ "% To assign a value to a parameter, put the desired value after the equals sign."
 					+ " Strings and characters will be read as is and should not be surrounded by quotation marks."
@@ -819,7 +819,7 @@ public abstract class Model extends SimState  {
 					+ " All model-level results will be outputted in a  file named '<fname>endresults.txt' at the end of each simulation"
 					+ " and in a file named '<fname>timeresults.txt' at set intervals throughout each simulation.\n"
 					+ "% To collect data at the agent level, use the key parameter '*agentInfo',"
-					+ " which is automatically followed by the names of all String, integer, and double fields of the agent class."
+					+ " which is automatically followed by the names of all primitive, String, and list type fields of the agent class."
 					+ " Keep the fields that you want to collect data on and delete those you do not want to collect data on."
 					+ " You can also add additional result names that are not fields to handle them manually in your model class."
 					+ " All agent-level results will be outputted in a file named '<fname>agentresults.txt' at set intervals throughout each simulation."
@@ -861,7 +861,7 @@ public abstract class Model extends SimState  {
 				for(int f = 0; f < fields.length; f++) {
 					// make sure each field is a type it can handle
 					Class c = fields[f].getType();
-					if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE)
+					if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE || Collection.class.isAssignableFrom(c) || Array.class.isAssignableFrom(c))
 						writer.write(fields[f].getName() + " = \n");
 					else if(c == Network.class) {
 						// also grab networks to suggest with edgelist
@@ -875,7 +875,10 @@ public abstract class Model extends SimState  {
 				if(this.agentclass != null) {
 					fields = this.agentclass.getDeclaredFields();
 					for(int f = 0; f < fields.length; f++) {
-						writer.write(fields[f].getName() + " ");
+						// make sure each field is a type it can handle
+						Class c = fields[f].getType();
+						if(c == String.class || c == Integer.TYPE || c == Double.TYPE || c == Character.TYPE || c == Boolean.TYPE || Collection.class.isAssignableFrom(c) || Array.class.isAssignableFrom(c))
+							writer.write(fields[f].getName() + " = \n");
 					}
 				}
 				// also add edge list if there are networks
