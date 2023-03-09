@@ -774,7 +774,7 @@ public abstract class Model extends SimState  {
 				// then check if it's a list to add its values
 				if(val instanceof Collection) {
 					p = Arrays.toString(((Collection)val).toArray());
-				} else if(val instanceof Array) {
+				} else if(val.getClass().isArray()) {
 					p = Arrays.toString((Object[]) val);
 				}else {
 					// otherwise add it to the string directly
