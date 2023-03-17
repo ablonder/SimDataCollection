@@ -104,6 +104,9 @@ public abstract class Model extends SimState  {
 	public Model(String fname) {
 		// I have to do this first, so I will, and I'll just have to reseed from file later
 		super(0);
+		// I'm also going to change the schedule into one of my accessible schedules
+		this.schedule = new AccessibleSchedule();
+		// now I can read in the file
 		String[] args = readFile(fname);
 		//and call run on args
 		run(args);
