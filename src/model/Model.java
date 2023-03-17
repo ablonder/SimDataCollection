@@ -695,7 +695,7 @@ public abstract class Model extends SimState  {
 					if(o < this.agents.length) {
 						a = this.agents[o];
 					}else {
-						a = schedagents[o-this.agents.length];
+						a = ((IterativeRepeat)schedagents[o-this.agents.length]).getSteppable();
 					}
 					// make sure the agent isn't null (there's no reason to print out all those empty lines)
 					if(a != null) {
