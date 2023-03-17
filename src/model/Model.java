@@ -683,18 +683,27 @@ public abstract class Model extends SimState  {
 			}
 			// and get individual agent results (if any have been designated, and this is the right interval)
 			if(this.agentres.length > 0 && (this.agentint == 0 || this.schedule.getSteps()%this.agentint == 0)) {
-				// loop through each agent in the list
-				for(int o = 0; o < this.agents.length; o++) {
-					// make sure the agent isn't null (there's no reason to print out all these empty lines)
-					if(this.agents[o] != null) {
+				// grab the agents from the schedule
+				Object[] schedagents = ((AccessibleSchedule)this.schedule).getAgents();
+				// loop through all agents in the schedule and on the list if additional agents have been added to it
+				for(int o = 0; o < this.agents.length + schedagents.length; o++) {
+					// grab the current agent from whichever list
+					Object a;
+					if(o < this.agents.length) {
+						a = this.agents[o];
+					}else {
+						a = schedagents[o-this.agents.length];
+					}
+					// make sure the agent isn't null (there's no reason to print out all those empty lines)
+					if(a != null) {
 						// initialize a string for the results for this agent
 						String res = "";
 						//  loop through each result and get the corresponding value
 						for(String r : this.agentres) {
-							res += getResult(r, this.agents[o], this.agentclass) + this.sep;
+							res += getResult(r, a, this.agentclass) + this.sep;
 						}
 						// write params, the agent's number, and the results to the agent results
-						this.agentwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + o + this.sep + this.agents[o] + this.sep + res + "\n");
+						this.agentwriter.write("" + s + this.sep + schedule.getSteps() + this.sep + params + o + this.sep + a + this.sep + res + "\n");
 					}
 				}
 			}
@@ -963,6 +972,15 @@ public abstract class Model extends SimState  {
 						Arrays.copyOfRange(splitparams, 1, splitparams.length),
 						Arrays.copyOfRange(splitkeys, 1, splitkeys.length), newargs);
 			}
+		}
+	}
+	
+	/*
+	 * A subclass of schedule for the express purpose of being able to grab all of the agents in the schedule
+	 */
+	class AccessibleSchedule extends Schedule{
+		public Object[] getAgents(){
+			return this.queue.getObjects();
 		}
 	}
 }

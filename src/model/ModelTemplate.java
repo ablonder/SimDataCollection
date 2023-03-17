@@ -43,8 +43,6 @@ public class ModelTemplate extends Model{
 	 */
 	public void start() {
 		super.start();
-		// TODO - to gather agent-level data, initialize Object[] agents from the Model class
-		// and add all agents you want to gather data on to it
 	}
 	
 	/*
