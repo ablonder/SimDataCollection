@@ -168,26 +168,14 @@ public abstract class Model extends SimState  {
 				String[] readline = line.split("%");
 				// then split each line at the equals sign
 				String[] splitline = readline[0].split("=");
-				// first check for lines without anything after the equals, or no equals at all
-				if(splitline.length < 2 || splitline[1].trim().length() < 1) {
-					// if there's actually something there and we're automatically gathering results, do that
-					if(this.autores && splitline[0].length() > 0) {
-						String r = splitline[0].trim();
-						// check if it's a list
-						try {
-							Field f = this.subclass.getField(r);
-							Class t = f.getType();
-							if(Collection.class.isAssignableFrom(t) || t.isArray()) {
-								templistres.add(r);
-							} else {
-								tempres.add(r);
-							}
-						}catch(NoSuchFieldException e) {
-							tempres.add(r);
-						}
+				// first check for key parameters marked by a star
+				if(line.charAt(0) == '*' && Arrays.asList(keyparams).contains(splitline[0].trim().substring(1))) {
+					// and modify the parameter's value directly (if a value has been given)
+					if(splitline[1].length() > 1) {
+						setParamVal(Model.class, splitline[0].trim().substring(1), splitline[1].trim());
 					}
 				} else if(this.autores && splitline[0].trim().equals("*agentInfo") && splitline[1].length() > 1) {
-					// otherwise, try to catch agentInfo (which should be a key parameter)
+					// otherwise, try to catch agentInfo (which should also be a key parameter)
 					// split the parameters to get the data gathered from each agent
 					ArrayList<String> newagentres = new ArrayList<String>(Arrays.asList(splitline[1].trim().split(" ")));
 					// also get the list of list-type agent parameters
@@ -212,22 +200,33 @@ public abstract class Model extends SimState  {
 					// store the resulting complete lists as arrays
 					this.agentres = oldagentres.toArray(new String[oldagentres.size()]);
 					this.agentlists = alistres.toArray(new String[alistres.size()]);
+				} else if(splitline.length < 2 || splitline[1].trim().length() < 1) {
+					// to gather results check for lines without anything after the equals or no equals at all
+					if(this.autores && splitline[0].length() > 0) {
+						String r = splitline[0].trim();
+						// check if it's a list
+						try {
+							Field f = this.subclass.getField(r);
+							Class t = f.getType();
+							if(Collection.class.isAssignableFrom(t) || t.isArray()) {
+								templistres.add(r);
+							} else {
+								tempres.add(r);
+							}
+						}catch(NoSuchFieldException e) {
+							tempres.add(r);
+						}
+					}
 				} else if(this.autores && splitline[0].trim().equals("*edgeList") && splitline[1].length() > 1) {
 					// also catch the edgeList (which should also be a key parameter)
 					// split the following parameters to get a list of network names to create edgelists of
 					this.nets = splitline[1].trim().split(" ");
 				}else if(splitline[1].length() > 1) {
 					// otherwise, if there's something after the equals sign, add it to params
-					// check for key parameters marked by a star
-					if(line.charAt(0) == '*' && Arrays.asList(keyparams).contains(splitline[0].trim().substring(1))) {
-						// modify the parameter's value
-						setParamVal(Model.class, splitline[0].trim().substring(1), splitline[1].trim());
-					} else {
-						// add the first part to the list of parameter names (via tempparams)
-						tempparams.add(splitline[0].trim());
-						// and the second part to the list of parameter values (via tempvals)
-						tempvals.add(splitline[1].trim());
-					}
+					// add the first part to the list of parameter names (via tempparams)
+					tempparams.add(splitline[0].trim());
+					// and the second part to the list of parameter values (via tempvals)
+					tempvals.add(splitline[1].trim());
 				}
 			}
 			// now these lists can become/be added to the official lists
