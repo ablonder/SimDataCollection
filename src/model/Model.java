@@ -16,11 +16,15 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.List;
 
 import ec.util.MersenneTwisterFast;
 import sim.engine.*;
 import sim.field.network.Edge;
 import sim.field.network.Network;
+import sim.util.Bag;
 import sim.util.distribution.Beta;
 import sim.util.distribution.Distributions;
 
@@ -985,4 +989,5 @@ public abstract class Model extends SimState  {
 			return this.queue.getObjects();
 		}
 	}
+	
 }
