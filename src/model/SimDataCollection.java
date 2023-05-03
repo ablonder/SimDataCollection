@@ -28,7 +28,7 @@ import sim.util.Bag;
 import sim.util.distribution.Beta;
 import sim.util.distribution.Distributions;
 
-public abstract class Model extends SimState  {
+public abstract class SimDataCollection extends SimState  {
 
 	// array to hold parameter values
 	public String[] params;
@@ -97,7 +97,7 @@ public abstract class Model extends SimState  {
 	/*
 	 * constructor when no file or arguments are given that just creates a template for input
 	 */
-	public Model() {
+	public SimDataCollection() {
 		super(0);
 		makeInputFile();
 	}
@@ -105,7 +105,7 @@ public abstract class Model extends SimState  {
 	/*
 	 * constructor that handles file input
 	 */
-	public Model(String fname) {
+	public SimDataCollection(String fname) {
 		// I have to do this first, so I will, and I'll just have to reseed from file later
 		super(0);
 		// I'm also going to change the schedule into one of my accessible schedules
@@ -120,7 +120,7 @@ public abstract class Model extends SimState  {
 	 * constructor that handles command line input
 	 * TODO - get this to work with keyparams or drop entirely
 	 */
-	public Model(String[] args) {
+	public SimDataCollection(String[] args) {
 		// runs the superclass constructor
 		super(Integer.parseInt(args[0]));
 		// creates the list of parameter names from the subclass
@@ -176,7 +176,7 @@ public abstract class Model extends SimState  {
 				if(line.charAt(0) == '*' && Arrays.asList(keyparams).contains(splitline[0].trim().substring(1))) {
 					// and modify the parameter's value directly (if a value has been given)
 					if(splitline[1].length() > 1) {
-						setParamVal(Model.class, splitline[0].trim().substring(1), splitline[1].trim());
+						setParamVal(SimDataCollection.class, splitline[0].trim().substring(1), splitline[1].trim());
 					}
 				} else if(this.autores && splitline[0].trim().equals("*agentInfo") && splitline[1].length() > 1) {
 					// otherwise, try to catch agentInfo (which should also be a key parameter)
@@ -917,7 +917,7 @@ public abstract class Model extends SimState  {
 	/*
 	 * Initializer to split an input file into multiple input files by provided parameters
 	 */
-	public Model(String fname, String[] splitparams, String[] splitkeys) {
+	public SimDataCollection(String fname, String[] splitparams, String[] splitkeys) {
 		super(0);
 		// start by initializing parameters, results, and values using the pre-existing function
 		String[] args = readFile(fname);
@@ -938,7 +938,7 @@ public abstract class Model extends SimState  {
 					// make sure it isn't the filename, which will be handled separately
 					if(!keyparams[k].equals("fname")) {
 						try {
-							writer.write("*" + keyparams[k] + " = " + Model.class.getField(keyparams[k]).get(this) + "\n");
+							writer.write("*" + keyparams[k] + " = " + SimDataCollection.class.getField(keyparams[k]).get(this) + "\n");
 						} catch (NoSuchFieldException e) {
 							System.out.println("Tried to access a field that doesn't exist");
 						} catch (IllegalAccessException e) {

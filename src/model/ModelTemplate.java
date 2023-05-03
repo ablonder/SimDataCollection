@@ -3,7 +3,7 @@ package model;
 /*
  * A template with the functions necessary for building a model to extend the Model class
  */
-public class ModelTemplate extends Model{
+public class ModelTemplate extends SimDataCollection{
 	
 	// All fields that you want to vary or output need to be public so that can be accessed by the Model class 
 	
