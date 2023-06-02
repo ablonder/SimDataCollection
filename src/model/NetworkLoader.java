@@ -16,7 +16,6 @@ public class NetworkLoader {
 	 * An additional utility for creating a network object from a file
 	 */
 	public Network readNetwork(String fname, HashMap<String, Object> nodes, String sep) {
-		// TODO - let nodes be a list or map and have options to handle each
 		// create a new empty network
 		Network net = new Network();
 		// now I can try to open the file
@@ -51,7 +50,7 @@ public class NetworkLoader {
 					Object n = nodes.get(s);
 					// if it doesn't really exist, create it
 					if(n == null) {
-						n = createNode(s);
+						n = new NodeContainer(s);
 						// and add it to the map
 						nodes.put(s, n);
 					}
@@ -106,9 +105,25 @@ public class NetworkLoader {
 	}
 	
 	/*
-	 * Helper function to creates nodes in the network - just returns the node's name if not implemented by the user 
+	 * Helper class to point to the actual node object
 	 */
-	public Object createNode(String s) {
-			return s;
+	class NodeContainer {
+		Node node;
+		String name;
+		
+		public NodeContainer(String s) {
+			this.name = s;
+		}
+	}
+	
+	/*
+	 * Another helper class to make sure that the node points to its container
+	 */
+	class Node {
+		NodeContainer container;
+		
+		public Node(NodeContainer c) {
+			this.container = c;
+		}
 	}
 }
