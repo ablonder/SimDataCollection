@@ -50,7 +50,7 @@ public class NetworkLoader {
 					Object n = nodes.get(s);
 					// if it doesn't really exist, create it
 					if(n == null) {
-						n = new NodeContainer(s);
+						n = new Node(s);
 						// and add it to the map
 						nodes.put(s, n);
 					}
@@ -105,25 +105,14 @@ public class NetworkLoader {
 	}
 	
 	/*
-	 * Helper class to point to the actual node object
-	 */
-	class NodeContainer {
-		Node node;
-		String name;
-		
-		public NodeContainer(String s) {
-			this.name = s;
-		}
-	}
-	
-	/*
-	 * Another helper class to make sure that the node points to its container
+	 * Helper class to point to the actual node object - users are encouraged to store a pointer to this container
 	 */
 	class Node {
-		NodeContainer container;
+		Object obj;
+		String name;
 		
-		public Node(NodeContainer c) {
-			this.container = c;
+		public Node(String s) {
+			this.name = s;
 		}
 	}
 }
