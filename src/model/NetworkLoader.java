@@ -108,8 +108,8 @@ public class NetworkLoader {
 	 * Helper class to point to the actual node object - users are encouraged to store a pointer to this container
 	 */
 	public class Node {
-		Object obj;
-		String name;
+		public Object obj;
+		public String name;
 		
 		public Node(String s) {
 			this.name = s;
