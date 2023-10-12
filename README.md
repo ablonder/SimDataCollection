@@ -1,4 +1,4 @@
-# SimDataCollection
+# A Faster Way to Run and Gather Data from Simulations
 
 The biggest advantage of computer simulations is the ability to run an immense number of simulations and collect vast amounts of data. SimDataCollection enables you to do just that; it automates the process of running simulations with different combinations of parameter values and gathering the results for easy analysis in R or Python.
 
